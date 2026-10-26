@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bàn thí nghiệm · Dụng cụ &amp; mẫu vật 3D</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#195658;color:#edf5ed;font-family:Arial,Helvetica,sans-serif}main{height:100svh;min-height:560px;position:relative;overflow:hidden}canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}header{position:absolute;top:36px;left:40px;pointer-events:none}.eyebrow{font-size:11px;letter-spacing:3px;text-transform:uppercase;margin:0 0 12px;color:#c3ded6}h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:clamp(30px,4vw,46px);letter-spacing:-1.5px;margin:0}header p{font-size:13px;line-height:1.7;max-width:240px;color:#d2e6df}.tag{position:absolute;right:40px;top:40px;font-size:11px;letter-spacing:2px;border:1px solid #87978b70;border-radius:30px;padding:10px 14px}.bottom{position:absolute;left:0;right:0;bottom:30px;display:flex;align-items:center;flex-direction:column;gap:14px}.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;padding:6px;border:1px solid #ffffff88;border-radius:32px;background:#f5f5efdd;box-shadow:0 10px 40px #17372b12;backdrop-filter:blur(16px)}button{font:12px Arial,sans-serif;background:transparent;border:0;padding:12px 17px;min-height:40px;border-radius:24px;color:#344c40;cursor:pointer}button:hover{background:#dce6dc}button[aria-pressed=true]{background:#304e40;color:#fff}button:focus-visible{outline:2px solid #557b65;outline-offset:3px}.hint{font-size:11px;letter-spacing:.2px;color:#435e50;background:#f5f5efc0;padding:7px 12px;border-radius:20px}.error{position:absolute;inset:40% 10% auto;text-align:center;line-height:1.7;background:#ffffffe8;padding:24px;border-radius:12px}.error[hidden]{display:none}@media(max-width:600px){header{left:22px;top:24px}header p{max-width:200px;font-size:12px}.tag{top:27px;right:20px;padding:8px;font-size:9px}.bottom{bottom:20px}button{padding:11px 13px}h1{font-size:28px;max-width:260px}.tag{display:none}}
+select{font:12px Arial;padding:10px;border:1px solid #9aaca0;border-radius:18px;background:#f5f5ef;color:#304e40;max-width:210px}.stagebar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:0 12px}.stagebar label{display:flex;align-items:center;gap:6px;font-size:12px;background:#f5f5efe8;padding:4px 9px;border-radius:22px}.bottom{gap:8px}header p{max-width:330px}.hint{max-width:94%;text-align:center}@media(max-width:600px){header p{font-size:11px}.stagebar label{font-size:11px}.stagebar select{max-width:165px}.bottom{bottom:12px}.hint{font-size:10px}}
+</style>
+</head>
+<body>
+<main>
+<canvas id="scene" tabindex="0" aria-label="Bàn thí nghiệm với 13 nhóm dụng cụ theo ảnh, xếp hai hàng; kéo xoay và cuộn để thu phóng.">Trình duyệt cần hỗ trợ WebGL để xem mô hình 3D.</canvas>
+<header><p class="eyebrow">Nghiên cứu hình khối / 01</p><h1>Bàn thí nghiệm</h1><p>13 nhóm dụng cụ · Bố trí theo ảnh<br>Chọn số để xem cận cảnh</p></header>
+<span class="tag">3D / GLASS</span>
+<div class="bottom"><div class="stagebar"><label>Góc nhìn <select id="focus"><option value="0">Toàn bộ theo ảnh</option><option value="1">1 · Đèn</option><option value="2">2 · Màng bọc thực phẩm</option><option value="3">3 · Hai bình tam giác</option><option value="4">4 · Cốc rỗng</option><option value="5">5 · Bộ đo CO₂</option><option value="6">6 · Đĩa Petri rỗng</option><option value="7">7 · Diêm</option><option value="8">8 · Giấy thấm</option><option value="9">9 · Túi đựng hạt</option><option value="10">10 · Nước vôi trong</option><option value="11">11 · Nước lọc</option><option value="12">12 · Hạt nảy mầm</option><option value="13">13 · Đậu xanh khô</option></select></label></div><div class="controls"><button id="rotate" aria-pressed="false">Tự xoay</button><button id="view">Xem từ dưới</button><button id="reset">Đặt lại góc nhìn</button></div><span class="hint">Kéo để xoay · Cuộn hoặc chụm hai ngón để thu phóng</span></div>
+<div class="error" id="error" role="alert" hidden></div>
+</main>
+<script>
+// Standalone procedural 3D: signed-distance geometry, ray tracing, refraction.
+// No external assets, libraries or network requests. Dimensions are inferred
+// from the reference image and are not manufacturing measurements.
+(()=>{'use strict';
+const canvas=document.getElementById('scene'),error=document.getElementById('error');
+const gl=canvas.getContext('webgl',{antialias:false,alpha:false,preserveDrawingBuffer:true});
+function fail(message){error.hidden=false;error.textContent=message;}
+if(!gl){fail('Trình duyệt này chưa bật WebGL. Hãy mở file bằng Chrome, Edge hoặc Safari có hỗ trợ tăng tốc đồ họa.');return;}
+const vertex=`attribute vec2 position;void main(){gl_Position=vec4(position,0.,1.);}`;
+const fragment=`
+precision highp float;
+uniform vec2 resolution;
+uniform vec3 eye;
+uniform vec3 target;
+uniform float floorVisible;
+uniform float smoothEdges;
+uniform sampler2D meterTexture;
+const float PETRI_RADIUS=.477;
+const vec3 PETRI_CENTER=vec3(-1.55,0.,1.35);
+const vec3 SPROUT_CENTER=vec3(3.0,0.,1.35);
+const vec3 DRY_CENTER=vec3(4.25,0.,1.35);
+const vec3 LIME_CENTER=vec3(3.2,0.,-.80);
+const float BEAKER_RADIUS=PETRI_RADIUS*.85;
+const vec3 BEAKER_CENTER=vec3(2.1,0.,-.80);
+float ellipsoid(vec3 p,vec3 r){float k0=length(p/r);float k1=length(p/(r*r));return k0*(k0-1.)/max(k1,.0001);}
+float torus(vec3 p,float r,float t){return length(vec2(length(p.xz)-r,p.y))-t;}
+float cylinder(vec3 p,float r,float h){vec2 d=abs(vec2(length(p.xz),p.y))-vec2(r,h);return min(max(d.x,d.y),0.)+length(max(d,0.));}
+// A shallow open dish: continuous glass bottom, thin cylindrical wall,
+// and a rounded upper rim. Its OUTER radius is exactly PETRI_RADIUS.
+float petriShape(vec3 p){
+ vec3 q=p-PETRI_CENTER;
+ float outside=cylinder(q-vec3(0.,.09,0.),PETRI_RADIUS-.006,.084)-.006;
+ float cavity=cylinder(q-vec3(0.,.164,0.),PETRI_RADIUS-.024,.136);
+ float dish=max(outside,-cavity);
+ float lip=torus(q-vec3(0.,.168,0.),PETRI_RADIUS-.012,.012);
+ return min(dish,lip);
+}
+// Open beaker with a thick base and rounded lip. The localized warp
+// at the upper left pulls the entire wall and lip into a pouring spout.
+float beakerShape(vec3 p){
+ vec3 q=p-BEAKER_CENTER;
+ float spout=.055*smoothstep(.82,1.06,q.y)*exp(-q.z*q.z/.009)*(1.-smoothstep(-.18,-.06,q.x));
+ q.x+=spout;
+ float outside=cylinder(q-vec3(0.,.54,0.),BEAKER_RADIUS-.025,.515)-.025;
+ float cavity=cylinder(q-vec3(0.,.64,0.),BEAKER_RADIUS-.048,.555)-.018;
+ float wall=max(outside,-cavity);
+ float rim=torus(q-vec3(0.,1.065,0.),BEAKER_RADIUS-.008,.015);
+ return min(wall,rim)*.65;
+}
+// White printed graduation marks; decorative, not a calibrated scale.
+float beakerMarks(vec3 p){
+ vec3 q=p-BEAKER_CENTER;
+ float radius=length(q.xz),angle=atan(q.x,q.z);
+ float surface=1.-smoothstep(.003,.008,abs(radius-BEAKER_RADIUS));
+ float rows=1.-smoothstep(.004,.007,abs(mod(q.y-.23+.0675,.135)-.0675));
+ float range=smoothstep(.20,.215,q.y)*(1.-smoothstep(.91,.93,q.y));
+ float ticks=rows*range*smoothstep(.10,.12,angle)*(1.-smoothstep(.53,.55,angle));
+ float spine=(1.-smoothstep(.008,.016,abs(angle-.12)))*range;
+ return max(ticks,spine)*surface;
+}
+float boxShape(vec3 p,vec3 b){vec3 d=abs(p)-b;return length(max(d,0.))+min(max(d.x,max(d.y,d.z)),0.);}
+vec2 closest(vec2 a,vec2 b){return a.x<b.x?a:b;}
+vec3 seedCell(vec3 q){return vec3(mod(q.x+.046,.092)-.046,q.y,mod(q.z+.046,.092)-.046);}
+float seeds(vec3 p,bool inCup){
+ vec3 q=p-(inCup?BEAKER_CENTER:PETRI_CENTER);
+ float mid=inCup?.21:.072;
+ float halfHeight=inCup?.135:.047;
+ float limit=cylinder(q-vec3(0.,mid,0.),inCup?.327:.407,halfHeight);
+ if(limit>.08)return limit;
+ vec3 cell=seedCell(q);cell.y=inCup?mod(q.y-.075,.081)-.0405:q.y-mid;
+ float id=sin(dot(floor((q.xz+.046)/.092),vec2(23.7,91.3)))*.5+.5;
+ float a=id*2.5;cell.xz=mat2(cos(a),-sin(a),sin(a),cos(a))*cell.xz;
+ return max(ellipsoid(cell,vec3(.034,.032,.044)),limit);
+}
+float sprouts(vec3 p){
+ vec3 q=p-PETRI_CENTER;float bound=cylinder(q-vec3(0.,.17,0.),.408,.12);
+ if(bound>.06)return bound;
+ vec3 cell=seedCell(q);float t=clamp((q.y-.105)/.16,0.,1.);
+ cell.x-=.022*sin(t*5.);cell.z-=.020*sin(t*3.);
+ float stem=max(length(cell.xz)-.007,abs(q.y-.185)-.08);
+ return max(stem,bound);
+}
+float waterShape(vec3 p){return cylinder(p-LIME_CENTER-vec3(0.,.345,0.),BEAKER_RADIUS-.037,.27);}
+// Flat, circular absorbent paper with a softly rounded, thin edge.
+const vec3 PAPER_CENTER=vec3(.65,.008,1.35);
+const float PAPER_RADIUS=.425;
+float paperShape(vec3 p){return cylinder(p-PAPER_CENTER,PAPER_RADIUS-.002,.004)-.002;}
+// Additional apparatus: dimensions are illustrative, not calibrated volumes.
+float capsule(vec3 p,vec3 a,vec3 b,float r){vec3 q=p-a,v=b-a;return length(q-v*clamp(dot(q,v)/dot(v,v),0.,1.))-r;}
+float flask(vec3 q){
+ float r=mix(.44,.15,clamp((q.y-.10)/.80,0.,1.));
+ float outside=max(length(q.xz)-r,max(.015-q.y,q.y-1.34));
+ float inner=max(length(q.xz)-(r-.027),max(.060-q.y,q.y-1.4));
+ float wall=max(outside,-inner)*.65;
+ return min(wall,torus(q-vec3(0.,1.30,0.),.15,.026));
+}
+vec2 extras(vec3 p){
+ vec2 h=vec2(100.,9.);
+ // A finite table with a wood top and four dark metal legs.
+ if(floorVisible>.5){
+  h=vec2(boxShape(p-vec3(.0,-.12,.15),vec3(4.85,.10,2.35))-.02,9.);
+  vec3 leg=p-vec3(0.,-1.30,.15);leg.xz=abs(leg.xz)-vec2(4.40,1.90);
+  h=closest(h,vec2(boxShape(leg,vec3(.075,1.08,.075)),11.));
+ }
+ // Desk lamp: base, bent arm, hollow tilted shade, bulb.
+ vec3 q=p-vec3(-3.90,0.,-.80);
+ float base=cylinder(q-vec3(0.,.10,0.),.46,.09)-.01;
+ h=closest(h,vec2(base,10.));
+ float arm=min(capsule(q,vec3(0.,.16,0.),vec3(.02,1.7,-.10),.045),capsule(q,vec3(.02,1.7,-.10),vec3(.48,2.10,-.05),.045));
+ h=closest(h,vec2(arm,11.));
+ vec3 shade=q-vec3(.58,1.98,.02);shade.xy=mat2(.80,-.60,.60,.80)*shade.xy;
+ float sr=mix(.39,.13,clamp((shade.y+.22)/.48,0.,1.));
+ float outer=max(length(shade.xz)-sr,abs(shade.y-.02)-.24);
+ float inner=max(length(shade.xz)-(sr-.025),abs(shade.y+.005)-.25);
+ h=closest(h,vec2(max(outer,-inner)*.7,10.));
+ h=closest(h,vec2(length(shade-vec3(0.,-.13,0.))-.13,23.));
+ // Roll of cling film in a yellow dispenser, with a short clear sheet.
+ q=p-vec3(-2.15,0.,-.80);
+ float carton=boxShape(q-vec3(0.,.15,0.),vec3(.90,.14,.24))-.01;
+ h=closest(h,vec2(carton,12.));
+ h=closest(h,vec2(cylinder(vec3(q.y-.31,q.x,q.z),.13,.83),24.));
+ h=closest(h,vec2(boxShape(q-vec3(0.,.014,.47),vec3(.79,.006,.20)),1.));
+ // Two stoppered Erlenmeyer flasks in the back row.
+ vec3 f1=p-vec3(0.,0.,-.80),f2=p-vec3(1.05,0.,-.80);
+ h=closest(h,vec2(min(flask(f1),flask(f2)),1.));
+ h=closest(h,vec2(min(cylinder(f1-vec3(0.,1.36,0.),.145,.10),cylinder(f2-vec3(0.,1.36,0.),.145,.10)),13.));
+ // Laboratory CO2 kit: landscape logger, separate blue probe and red lead.
+ vec3 kit=p+vec3(1.95,0.,1.07);
+ q=kit-vec3(-1.85,0.,2.22);
+ float logger=boxShape(q-vec3(0.,.115,0.),vec3(.61,.045,.32))-.07;
+ float screenCut=boxShape(q-vec3(0.,.24,-.015),vec3(.49,.035,.225))-.015;
+ logger=max(logger,-screenCut);
+ h=closest(h,vec2(logger,14.));
+ h=closest(h,vec2(boxShape(q-vec3(0.,.207,-.015),vec3(.49,.009,.225))-.010,15.));
+ h=closest(h,vec2(boxShape(q-vec3(0.,.028,0.),vec3(.60,.012,.31))-.025,11.));
+ // External probe housing, red identification panel and black sensing stem.
+ vec3 probe=kit-vec3(-.72,0.,2.30);
+ h=closest(h,vec2(boxShape(probe-vec3(0.,.105,0.),vec3(.18,.075,.28))-.02,25.));
+ h=closest(h,vec2(boxShape(probe-vec3(0.,.199,0.),vec3(.105,.006,.19))-.012,26.));
+ h=closest(h,vec2(capsule(probe,vec3(0.,.105,-.29),vec3(0.,.105,-.69),.042),11.));
+ for(int i=0;i<3;i++){
+  vec3 ring=probe-vec3(0.,.105,-.43-float(i)*.075);
+  h=closest(h,vec2(torus(vec3(ring.x,ring.z,ring.y),.042,.006),14.));
+ }
+ h=closest(h,vec2(length(probe-vec3(0.,.105,-.70))-.047,14.));
+ // Two oblong cable loops laid flat, joined to both instruments.
+ vec3 c1=kit-vec3(-1.85,.034,2.94),c2=kit-vec3(-1.78,.038,3.15);
+ float loop1=(length(vec2(length(c1.xz/vec2(.70,.14))-1.,c1.y/.14))-.12)*.14;
+ float loop2=(length(vec2(length(c2.xz/vec2(.70,.14))-1.,c2.y/.14))-.12)*.14;
+ float lead=capsule(kit,vec3(-2.50,.10,2.22),vec3(-2.55,.034,2.94),.017);
+ lead=min(lead,capsule(kit,vec3(-1.15,.034,2.94),vec3(-1.08,.038,3.15),.017));
+ lead=min(lead,capsule(kit,vec3(-2.48,.038,3.15),vec3(-.72,.045,2.78),.017));
+ lead=min(lead,capsule(kit,vec3(-.72,.045,2.78),vec3(-.72,.105,2.60),.017));
+ h=closest(h,vec2(min(min(loop1,loop2),lead),16.));
+ // Matchbox and three visible wooden matches beside it.
+ q=p-vec3(-.45,0.,1.35);
+ h=closest(h,vec2(boxShape(q-vec3(0.,.07,0.),vec3(.21,.065,.30))-.005,17.));
+ for(int i=0;i<6;i++){float x=-.15+float(i)*.06;h=closest(h,vec2(capsule(q,vec3(x,.15,-.19),vec3(x,.15,.22),.012),24.));h=closest(h,vec2(length(q-vec3(x,.15,-.19))-.023,18.));}
+ // Folded cloth seed bag with a drawstring.
+ q=p-vec3(1.80,0.,1.35);
+ float cloth=boxShape(q-vec3(0.,.045,0.),vec3(.38,.027,.45))-.018;
+ h=closest(h,vec2(cloth,19.));
+ h=closest(h,vec2(min(capsule(q,vec3(-.25,.075,-.39),vec3(.25,.075,-.39),.008),capsule(q,vec3(.25,.075,-.39),vec3(.48,.04,-.57),.009)),19.));
+ // Wash bottle of filtered water, with its characteristic bent nozzle.
+ q=p-vec3(4.35,0.,-.80);
+ float bottle=cylinder(q-vec3(0.,.48,0.),.28,.42)-.045;
+ bottle=min(bottle,cylinder(q-vec3(0.,.98,0.),.125,.12));
+ h=closest(h,vec2(bottle,20.));
+ h=closest(h,vec2(min(capsule(q,vec3(0.,1.08,0.),vec3(-.08,1.34,0.),.025),capsule(q,vec3(-.08,1.34,0.),vec3(-.34,1.42,0.),.025)),20.));
+ // Back-row limewater beaker, then the two front-row specimen dishes.
+ h=closest(h,vec2(beakerShape(p-LIME_CENTER+BEAKER_CENTER),1.));
+ h=closest(h,vec2(petriShape(p-SPROUT_CENTER+PETRI_CENTER),1.));
+ h=closest(h,vec2(seeds(p-SPROUT_CENTER+PETRI_CENTER,false),22.));
+ h=closest(h,vec2(sprouts(p-SPROUT_CENTER+PETRI_CENTER),4.));
+ h=closest(h,vec2(petriShape(p-DRY_CENTER+PETRI_CENTER),1.));
+ h=closest(h,vec2(seeds(p-DRY_CENTER+PETRI_CENTER,false),2.));
+ return h;
+}
+vec2 sceneMap(vec3 p){
+ vec2 hit=closest(vec2(min(petriShape(p),beakerShape(p)),1.),extras(p));
+ hit=closest(hit,vec2(abs(waterShape(p)),7.));
+ hit=closest(hit,vec2(paperShape(p),8.));
+ return hit;
+}
+float shape(vec3 p){return sceneMap(p).x;}
+vec3 opaqueColor(vec3 p,float material){
+ if(material>25.5){vec3 q=p-vec3(-2.67,.199,1.23);float stripe=(1.-smoothstep(.003,.007,abs(mod(q.x+.06,.036)-.018)))*step(abs(q.z),.10);return mix(vec3(.55,.055,.025),vec3(.95,.84,.65),stripe*.8);}
+ if(material>24.5)return vec3(.21,.20,.55);
+ if(material>22.5&&material<23.5)return vec3(1.6,1.45,1.05);
+ if(material>23.5)return vec3(.74,.64,.44);
+ if(material>21.5)return vec3(.29,.37,.045);
+ if(material>19.5)return vec3(.84,.90,.86);
+ if(material>18.5){float weave=sin(p.x*180.)*sin(p.z*180.)*.035;return vec3(.85,.83,.71)+weave;}
+ if(material>17.5)return vec3(.45,.06,.025);
+ if(material>16.5){vec3 q=p-vec3(-.45,0.,1.35);return abs(q.x)>.19?vec3(.20,.12,.08):vec3(.65,.19,.07);}
+ if(material>15.5)return vec3(.60,.025,.018);
+ if(material>14.5){vec3 q=p-vec3(-3.80,.207,1.135);vec2 uv=clamp(vec2(q.x/1.0+.5,.5-q.z/.47),0.,1.);return texture2D(meterTexture,uv).rgb;}
+ if(material>13.5)return vec3(.91,.93,.90);
+ if(material>12.5)return vec3(.37,.15,.06);
+ if(material>11.5)return vec3(.83,.65,.08);
+ if(material>10.5)return vec3(.13,.17,.18);
+ if(material>9.5)return vec3(.69,.30,.40);
+ if(material>8.5){float grain=sin(p.x*5.+sin(p.z*2.)*.6)*.022+sin(p.x*95.+p.z*3.)*.006;vec3 wood=vec3(.47,.32,.19)+grain;float contact=1.-.18*exp(-dot(p.xz,p.xz)/1.3);return wood*contact;}
+ if(material>7.5){vec3 q=p-PAPER_CENTER;float grain=sin(q.x*240.+sin(q.z*161.))*sin(q.z*211.)*.006;return vec3(.89,.93,.94)+grain;}
+ if(material<2.5){vec3 q=p-DRY_CENTER;float seedId=fract(sin(dot(floor((q.xz+.046)/.092),vec2(32.1,71.2)))*451.8);vec3 c=mix(vec3(.17,.25,.035),vec3(.43,.46,.075),seedId);vec3 cell=seedCell(q);float seam=(1.-smoothstep(.003,.008,abs(cell.x)))*(1.-smoothstep(.015,.026,abs(cell.z)));return mix(c,vec3(.71,.68,.36),seam*.65);}
+ if(material<4.5)return vec3(.88,.88,.64);
+ return vec3(.9);
+
+}
+vec3 normal(vec3 p){vec2 e=vec2(.0004,0.);if(sceneMap(p).y>6.5&&sceneMap(p).y<7.5)return normalize(vec3(waterShape(p+e.xyy)-waterShape(p-e.xyy),waterShape(p+e.yxy)-waterShape(p-e.yxy),waterShape(p+e.yyx)-waterShape(p-e.yyx)));return normalize(vec3(shape(p+e.xyy)-shape(p-e.xyy),shape(p+e.yxy)-shape(p-e.yxy),shape(p+e.yyx)-shape(p-e.yyx)));}
+vec2 bounds(vec3 ro,vec3 rd){vec3 inv=1./(rd+vec3(.0000001));vec3 a=(vec3(-4.90,-2.50,-2.25)-ro)*inv;vec3 b=(vec3(4.90,2.65,2.55)-ro)*inv;vec3 lo=min(a,b),hi=max(a,b);return vec2(max(max(lo.x,lo.y),lo.z),min(min(hi.x,hi.y),hi.z));}
+float trace(vec3 ro,vec3 rd){vec2 box=bounds(ro,rd);float t=max(0.,box.x);if(box.y<t)return -1.;for(int i=0;i<192;i++){float d=abs(shape(ro+rd*t));if(d<.0002)return t;t+=max(d*.78,.00015);if(t>box.y+.01)break;}return -1.;}
+float panel(vec3 ro,vec3 rd,vec3 center,vec3 axis,vec2 size){
+ vec3 n=normalize(center-vec3(0.,1.8,0.));float den=dot(rd,n);float t=dot(center-ro,n)/den;if(t<0.)return 0.;
+ vec3 u=normalize(cross(axis,n)),v=cross(n,u),p=ro+rd*t-center;
+ vec2 q=abs(vec2(dot(p,u),dot(p,v)))-size;
+ return (1.-smoothstep(-.05,.05,q.x))*(1.-smoothstep(-.12,.12,q.y));
+}
+vec3 environment(vec3 ro,vec3 rd){
+ vec3 color=mix(vec3(.045,.16,.16),vec3(.28,.40,.36),smoothstep(-.4,.65,rd.y));
+ float a=panel(ro,rd,vec3(-3.8,2.6,2.5),vec3(0.,1.,0.),vec2(.36,2.1));
+ float b=panel(ro,rd,vec3(3.6,2.5,1.3),vec3(0.,1.,0.),vec2(.22,1.9));
+ float c=panel(ro,rd,vec3(-.5,5.,-.5),vec3(0.,0.,1.),vec2(1.5,.65));
+ float d=panel(ro,rd,vec3(1.2,2.8,-4.),vec3(0.,1.,0.),vec2(.55,1.6));
+ color+=vec3(3.8,3.95,4.)*a+vec3(3.3,3.45,3.2)*b+vec3(2.5,2.45,2.25)*c+vec3(1.8,2.,1.9)*d;
+ return color;
+}
+vec3 background(vec3 ro,vec3 rd){
+ vec3 linearTeal=pow(vec3(25.,86.,88.)/255.,vec3(2.2));
+ return linearTeal/(1.-.32*linearTeal);
+}
+vec3 render(vec3 ro,vec3 rd){vec3 result=vec3(0.),throughput=vec3(1.);bool hitAny=false;
+ for(int bounce=0;bounce<8;bounce++){
+ float t=trace(ro,rd);if(t<0.){result+=throughput*background(ro,rd);return result;}
+ vec3 p=ro+rd*t;vec3 n=normal(p);bool exiting=dot(rd,n)>0.;if(exiting)n=-n;
+ float material=sceneMap(p).y;
+ if((material>1.5&&material<6.5)||material>7.5){
+  vec3 light=normalize(vec3(-3.,5.,4.));float diffuse=max(0.,dot(n,light));
+  float occlusion=clamp(shape(p+n*.045)/.045,.25,1.);
+  vec3 color=opaqueColor(p,material)*(.38+.62*diffuse)*(.65+.35*occlusion);
+  return result+throughput*color;
+ }
+ float ink=material<1.5?max(beakerMarks(p),beakerMarks(p-LIME_CENTER+BEAKER_CENTER)):0.;
+ if(ink>.001&&!exiting){
+  vec3 printColor=vec3(.86,.91,.87)*(.75+.25*max(0.,dot(n,normalize(vec3(-2.,4.,3.)))));
+  result+=throughput*ink*printColor;
+  throughput*=1.-ink;
+ }
+ float ior=material>6.5?1.333:1.46;
+ float f0=pow((ior-1.)/(ior+1.),2.);
+ float cosine=max(0.,-dot(rd,n));float f=f0+(1.-f0)*pow(1.-cosine,5.);
+ if(exiting)throughput*=exp(-vec3(.12,.035,.075)*t);
+ vec3 reflectDir=reflect(rd,n);vec3 refl=environment(p,reflectDir);
+ if(reflectDir.y<-.1)refl=mix(refl,background(p,reflectDir),.45);
+ vec3 refractDir=refract(rd,n,exiting?ior:1./ior);
+ if(dot(refractDir,refractDir)<.01){rd=reflectDir;ro=p+rd*.0015;continue;}
+ result+=throughput*f*refl;throughput*=1.-f;rd=normalize(refractDir);ro=p+rd*.0015;hitAny=true;
+ }
+ return result+throughput*background(ro,rd);
+}
+vec3 pixelColor(vec2 pixel,vec3 forward,vec3 right,vec3 up){
+ vec2 uv=(pixel*2.-resolution)/resolution.y;
+ vec3 rd=normalize(forward*2.7+right*uv.x+up*uv.y);
+ vec3 col=render(eye,rd);
+ return col/(1.+col*.32);
+}
+void main(){
+ vec3 forward=normalize(target-eye);
+ vec3 right=normalize(cross(forward,vec3(0.,1.,0.)));
+ vec3 up=cross(right,forward);
+ vec3 col;
+ // Sample the actual ray-traced glass four times per pixel. Canvas MSAA
+ // alone cannot smooth silhouettes generated inside a fragment shader.
+ if(smoothEdges>.5){
+  col=pixelColor(gl_FragCoord.xy+vec2(-.25,-.25),forward,right,up);
+  col+=pixelColor(gl_FragCoord.xy+vec2(.25,-.25),forward,right,up);
+  col+=pixelColor(gl_FragCoord.xy+vec2(-.25,.25),forward,right,up);
+  col+=pixelColor(gl_FragCoord.xy+vec2(.25,.25),forward,right,up);
+  col*=.25;
+ }else{col=pixelColor(gl_FragCoord.xy,forward,right,up);}
+ col=pow(max(col,0.),vec3(1./2.2));
+ vec2 uv=(gl_FragCoord.xy*2.-resolution)/resolution.y;
+ float vignette=1.-.055*dot(uv,uv);
+ gl_FragColor=vec4(col,1.);
+}
+`;
+function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;}
+let program;
+try{program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vertex));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));gl.useProgram(program);}catch(e){console.error(e);fail('Không thể khởi tạo mô hình 3D trên thiết bị này. Vui lòng thử trình duyệt hỗ trợ WebGL.');return;}
+const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const pos=gl.getAttribLocation(program,'position');gl.enableVertexAttribArray(pos);gl.vertexAttribPointer(pos,2,gl.FLOAT,false,0,0);
+const uniforms={};['resolution','eye','target','floorVisible','smoothEdges','meterTexture'].forEach(k=>uniforms[k]=gl.getUniformLocation(program,k));
+let focus=0;
+let yaw=0,pitch=.82,distance=16.5,auto=false,under=false,frame=0,settle,last=0;
+const rotate=document.getElementById('rotate'),view=document.getElementById('view');
+function draw(moving=false){
+ const rect=canvas.getBoundingClientRect();
+ if(rect.width<=0||rect.height<=0)return;
+ // Respect Retina displays while bounding the cost of refraction.
+ const pixelBudget=moving?1200000:3200000;
+ const maxSide=moving?1440:2400;
+ const scale=Math.min(Math.max(1,window.devicePixelRatio||1),moving?1:2,maxSide/Math.max(rect.width,rect.height),Math.sqrt(pixelBudget/(rect.width*rect.height)));
+ const w=Math.max(1,Math.round(rect.width*scale)),h=Math.max(1,Math.round(rect.height*scale));
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}
+ const aspect=rect.width/rect.height;
+ const targets=[[0,.35,.15],[-3.9,.9,-.8],[-2.15,.15,-.5],[.525,.65,-.8],[2.1,.5,-.8],[-3.15,.15,1.5],[-1.55,.10,1.35],[-.45,.08,1.35],[.65,.01,1.35],[1.8,.05,1.35],[3.2,.5,-.8],[4.35,.65,-.8],[3,.13,1.35],[4.25,.13,1.35]];
+ const aim=targets[focus];
+ const focusDistance=[1,.31,.27,.27,.19,.28,.16,.13,.14,.17,.19,.22,.16,.16][focus];
+ const dist=distance*focusDistance*Math.max(1,(focus? .65:1.05)/aspect);
+ const y=aim[1]+Math.sin(pitch)*dist;
+ gl.uniform2f(uniforms.resolution,w,h);
+ gl.uniform3f(uniforms.eye,aim[0]+Math.sin(yaw)*Math.cos(pitch)*dist,y,aim[2]+Math.cos(yaw)*Math.cos(pitch)*dist);
+ gl.uniform3f(uniforms.target,...aim);
+ gl.uniform1f(uniforms.floorVisible,under?0:1);
+ gl.uniform1f(uniforms.smoothEdges,moving?0:1);
+ gl.drawArrays(gl.TRIANGLES,0,6);
+}
+function request(moving=false){cancelAnimationFrame(frame);clearTimeout(settle);frame=requestAnimationFrame(()=>draw(moving));if(moving){settle=setTimeout(()=>request(false),180);}}
+function animate(now){if(!auto)return;const dt=Math.min((now-last)/1000,.05);last=now;yaw+=dt*.22;draw(true);frame=requestAnimationFrame(animate);}
+function setAuto(on){clearTimeout(settle);auto=on;rotate.setAttribute('aria-pressed',String(on));rotate.textContent=on?'Dừng xoay':'Tự xoay';cancelAnimationFrame(frame);if(on){last=performance.now();frame=requestAnimationFrame(animate);}else request();}
+rotate.onclick=()=>setAuto(!auto);
+view.onclick=()=>{setAuto(false);under=!under;pitch=under?-.48:.82;view.textContent=under?'Xem từ phía trước':'Xem từ dưới';view.setAttribute('aria-pressed',String(under));request();};
+document.getElementById('reset').onclick=()=>{setAuto(false);focus=0;document.getElementById('focus').value='0';yaw=0;pitch=.82;distance=16.5;under=false;view.textContent='Xem từ dưới';view.setAttribute('aria-pressed','false');request();};
+const pointers=new Map();let pinch=0;
+canvas.addEventListener('pointerdown',e=>{setAuto(false);canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});pinch=0;});
+canvas.addEventListener('pointermove',e=>{const previous=pointers.get(e.pointerId);if(!previous)return;const dx=e.clientX-previous.x,dy=e.clientY-previous.y;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const [a,b]=[...pointers.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch)distance=Math.max(4.9,Math.min(23,distance*pinch/d));pinch=d;}else{yaw-=dx*.008;pitch=Math.max(under?-.95:-.16,Math.min(1.08,pitch+dy*.005));}request(true);});
+['pointerup','pointercancel','lostpointercapture'].forEach(type=>canvas.addEventListener(type,e=>{pointers.delete(e.pointerId);pinch=0;request();}));
+canvas.addEventListener('wheel',e=>{e.preventDefault();setAuto(false);distance=Math.max(4.9,Math.min(23,distance*Math.exp(e.deltaY*.001)));request(true);},{passive:false});
+canvas.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-'].includes(e.key))return;e.preventDefault();setAuto(false);if(e.key==='ArrowLeft')yaw-=.1;if(e.key==='ArrowRight')yaw+=.1;if(e.key==='ArrowUp')pitch=Math.min(1.08,pitch+.08);if(e.key==='ArrowDown')pitch=Math.max(under?-.95:-.16,pitch-.08);if(e.key==='+'||e.key==='=')distance=Math.max(4.9,distance-.3);if(e.key==='-')distance=Math.min(23,distance+.3);request();});
+window.addEventListener('resize',()=>{if(!auto)request();});document.addEventListener('visibilitychange',()=>{if(document.hidden&&auto)setAuto(false);});canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();setAuto(false);fail('Kết nối đồ họa bị gián đoạn. Tải lại trang để tiếp tục xem.');});
+const meterCanvas=document.createElement('canvas');meterCanvas.width=1024;meterCanvas.height=512;
+const meterContext=meterCanvas.getContext('2d');
+meterContext.fillStyle='#d2dcda';meterContext.fillRect(0,0,1024,512);
+meterContext.fillStyle='#45616c';meterContext.textAlign='left';meterContext.font='bold 54px Arial';meterContext.fillText('CO₂',50,72);meterContext.font='42px monospace';meterContext.fillText('— ppm',710,72);
+meterContext.fillStyle='#b5c5c5';for(let x=70;x<980;x+=90)meterContext.fillRect(x,115,2,290);for(let y=115;y<420;y+=58)meterContext.fillRect(70,y,900,2);
+meterContext.fillStyle='#668f9d';for(let x=0;x<880;x+=5){const y=345-x*.15+Math.sin(x*.015)*16;meterContext.fillRect(70+x,y,6,5);}
+meterContext.fillStyle='#45616c';meterContext.font='25px Arial';meterContext.fillText('CO₂ · ĐẦU DÒ RỜI',65,470);meterContext.fillText('ĐỒ THỊ MINH HỌA',670,470);
+const meterTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,meterTexture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,meterCanvas);gl.uniform1i(uniforms.meterTexture,1);
+document.getElementById('focus').onchange=e=>{setAuto(false);focus=Number(e.target.value);pitch=focus?.82:.82;under=false;view.textContent='Xem từ dưới';view.setAttribute('aria-pressed','false');request();};
+draw();window.bellModel={getState:()=>({yaw,pitch,distance,auto,under,focus}),render:()=>draw()};
+})();
+</script>
+</body>
+</html>
