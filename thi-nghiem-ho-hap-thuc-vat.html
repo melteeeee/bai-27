@@ -581,7 +581,7 @@ function renderStep0(){
 /* Bước 2 · tiến hành */
 /* ---------- Thí nghiệm 1 · Phương án 1: học sinh thao tác trên bàn 3D ---------- */
 const PA1_TEXT={
-  seed:{b:2,ttl:'Cho hạt nảy mầm vào túi vải',gd:'Hai bình tam giác đã có sẵn <span class="b">50 ml nước vôi trong</span> (bước 1) — rê chuột hoặc chạm vào bình để xem tên. Kéo <span class="b">đĩa hạt đậu xanh nảy mầm</span> tới <span class="b">túi vải 1</span> rồi thả tay để đổ hạt vào túi.',how:'drag'},
+  seed:{b:2,ttl:'Cho hạt nảy mầm vào túi vải',gd:'Hai bình tam giác đã có sẵn <span class="b">50 ml nước vôi trong</span> (bước 1) — rê chuột hoặc chạm vào dụng cụ để xem tên. Kéo <span class="b">đĩa hạt đậu xanh nảy mầm</span> tới <span class="b">túi vải 1</span> rồi thả tay để đổ hạt vào túi.',how:'drag'},
   open1:{b:2,ttl:'Mở nút cao su bình 1',gd:'Kéo <span class="b">nút cao su</span> của bình 1 nhấc ra, đặt xuống bàn.',how:'drag'},
   bag1:{b:2,ttl:'Đặt túi hạt vào bình 1',gd:'Kéo <span class="b">túi vải có hạt</span> tới miệng <span class="b">bình 1</span> rồi thả tay. Túi được treo sao cho đáy túi <span class="b">không chạm</span> mặt nước vôi trong.',how:'drag'},
   close1:{b:2,ttl:'Đậy kín bình 1',gd:'Kéo <span class="b">nút cao su</span> trên bàn đặt lại vào miệng bình 1, đảm bảo <span class="b">kín khí</span>.',how:'drag'},
@@ -1096,7 +1096,7 @@ const PA1_LAYOUT={flask:[[-.9,0,-.3],[.9,0,-.3]],dish:[-2.45,0,1.2],bag:[[-.9,0,
 const PA1_VIEW={t:[-.35,.6,.45],fd:.52};
 const WATER_MILKY=lin(.93,.93,.9),WATER_TINT=lin(.8,.93,.95);
 const HANG_Y=1.3,POUCH_DROP=.8,HOLD_Y=1.8;   // điểm buộc dây ở cổ bình; túi treo thấp hơn 0,8 (đáy túi ở 0,5 — trên mặt nước 0,32)
-const pa1={active:false,i:0,hover:-1,seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false,onChange:null};
+const pa1={active:false,i:0,hover:null,seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false,onChange:null};
 let lab=null;
 function pa1Emit(msg){ dirty=true; pa1.onChange&&pa1.onChange(msg||null); }
 function oneSprout(){
@@ -1322,12 +1322,14 @@ function stepStoppers(dt){
   return any;
 }
 let hoverTimer=0;
-function pa1Hover(k,brief){
-  clearTimeout(hoverTimer);
-  if(pa1.hover!==k){ pa1.hover=k; dirty=true; }
-  if(brief&&k>=0) hoverTimer=setTimeout(()=>{ pa1.hover=-1; dirty=true; },2200);    // chạm: hiện 2 giây
+/* nhãn tên (bình, túi, đĩa hạt) chỉ hiện khi rê chuột vào; chạm trên điện thoại thì hiện 2 giây */
+const labelled=g=>!!(lab&&g&&(lab.flasks.includes(g)||lab.bag.includes(g)||g===lab.dish));
+function pa1Hover(g,brief){
+  clearTimeout(hoverTimer); g=labelled(g)?g:null;
+  if(pa1.hover!==g){ pa1.hover=g; dirty=true; }
+  if(brief&&g) hoverTimer=setTimeout(()=>{ pa1.hover=null; dirty=true; },2200);
 }
-canvas.addEventListener('pointerleave',()=>{ if(pa1.active) pa1Hover(-1); });
+canvas.addEventListener('pointerleave',()=>{ if(pa1.active) pa1Hover(null); });
 function pa1Phys(dt){ if(!lab) return false; const a=stepPour(dt),b=stepSeeds(dt),c=stepPouches(dt),d=stepStoppers(dt); return a||b||c||d; }
 
 /* thực hiện thao tác hiện tại (học sinh làm đúng, hoặc bấm "Làm nhanh") */
@@ -1351,7 +1353,7 @@ function pa1Click(g,obj){
   const L=lab,a=pa1Action(); if(!L||anims.length||pa1Busy) return true;
   const flaskIdx=L.flasks.indexOf(g);
   if((a.startsWith('open')||a.startsWith('close'))&&flaskIdx===flaskOf(a)){ pa1Do(); return true; }
-  if(flaskIdx>=0){ pa1Hover(flaskIdx,true); return true; }      // chạm vào bình (điện thoại): hiện tên bình
+  if(labelled(g)){ pa1Hover(g,true); return true; }      // chạm vào dụng cụ (điện thoại): hiện tên
   return false;
 }
 function pa1CanDrag(g){
@@ -1382,7 +1384,7 @@ function pa1Exit(){
   tween=true; dirty=true;
 }
 function pa1Restart(){
-  Object.assign(pa1,{i:0,hover:-1,seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false}); anims.length=0;
+  Object.assign(pa1,{i:0,hover:null,seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false}); anims.length=0;
   if(lab){ stopDrag=null; lab.pour=null; lab.seeds.forEach(s=>scene.remove(s.m)); lab.seeds.length=0; lab.poured.clear(); pa1Busy=false; }
   if(pa1.active){ pa1Apply(); pa1Emit(); }
 }
@@ -1548,7 +1550,7 @@ canvas.addEventListener('pointerdown',e=>{
 });
 canvas.addEventListener('pointermove',e=>{
   const prev=pointers.get(e.pointerId);
-  if(!prev){ const h=pickHit(e),g=h&&h.g; if(pa1.active&&lab) pa1Hover(g?lab.flasks.indexOf(g):-1); canvas.style.cursor=g&&(!pa1.active||pa1CanDrag(g)||stopperOf(h.obj)>=0)?'grab':g?'pointer':'default'; return; }
+  if(!prev){ const h=pickHit(e),g=h&&h.g; if(pa1.active&&lab) pa1Hover(g); canvas.style.cursor=g&&(!pa1.active||pa1CanDrag(g)||stopperOf(h.obj)>=0)?'grab':g?'pointer':'default'; return; }
   const dx=e.clientX-prev.x,dy=e.clientY-prev.y; pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(stopperMove(e)) return;
   if(drag){
@@ -1583,9 +1585,9 @@ function pa1Tags(){
   if(!pa1.active||!lab) return [];
   const L=lab,t=[],h=pa1.hours;
   // tên bình chỉ hiện khi rê chuột / chạm vào bình
-  L.flasks.forEach((f,k)=>{ if(pa1.hover===k) t.push({text:`Bình ${k+1} · 50 ml nước vôi ${k===0&&h>=.6?'(vẩn đục)':'trong'}`,p:[f.position.x,1.72,f.position.z]}); });
-  L.bag.forEach((b,k)=>{ if(b.visible) t.push({text:k?'Túi vải 2 (rỗng)':pa1.seeded?'Túi vải 1 · có hạt':'Túi vải 1',p:[b.position.x,.3,b.position.z]}); });
-  t.push({text:'Hạt đậu xanh nảy mầm',p:[L.dish.position.x,.42,L.dish.position.z]});
+  L.flasks.forEach((f,k)=>{ if(pa1.hover===f) t.push({text:`Bình ${k+1} · 50 ml nước vôi ${k===0&&h>=.6?'(vẩn đục)':'trong'}`,p:[f.position.x,1.72,f.position.z]}); });
+  L.bag.forEach((b,k)=>{ if(b.visible&&pa1.hover===b) t.push({text:k?'Túi vải 2 (rỗng)':pa1.seeded?'Túi vải 1 · có hạt':'Túi vải 1',p:[b.position.x,.3,b.position.z]}); });
+  if(pa1.hover===L.dish) t.push({text:'Hạt đậu xanh nảy mầm',p:[L.dish.position.x,.8,L.dish.position.z]});
   return t;
 }
 window.bellModel={
