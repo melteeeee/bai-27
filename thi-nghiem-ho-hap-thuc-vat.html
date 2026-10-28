@@ -1020,7 +1020,7 @@ const glbJobs=Object.entries(PLACE).flatMap(([n,spots])=>spots.map(pos=>loadGLB(
 // 5 · Cảm biến CO₂: ghép 3 phần; gốc toạ độ chung nằm cách tâm màn hình 0,55 về phía đầu dò
 glbJobs.push(Promise.all(CO2_PARTS.map(loadGLB)).then(parts=>{ const g=new THREE.Group(); parts.forEach(p=>g.add(p)); addItem(5,g,[-3.25,0,1.15]); }));
 
-/* ---------------- hạt đậu xanh (khô / nảy mầm) dựng bằng instancing ----------------
+/* ---------------- hạt nảy mầm rơi khi đổ vào túi (phương án 1) ----------------
    Hạt nảy mầm: vỏ xanh bóng nứt ra, lộ lá mầm màu kem, rễ mầm trắng ngà thon dần, cong, đầu rễ hơi nâu */
 const beanCoatGeo=new THREE.SphereGeometry(1,18,12),cotGeo=new THREE.SphereGeometry(1,14,10);
 function taperTube(points,r0,r1,tipColor){
@@ -1040,32 +1040,7 @@ const RADICLES=[
   [[0,0,.04],[.006,-.006,.07],[.004,-.01,.1]],
   [[0,0,.04],[.01,-.004,.085],[.035,-.006,.12],[.07,-.002,.14],[.09,.01,.15]],
 ].map(p=>taperTube(p,.011,.0035,[.62,.48,.28]));
-const coatMat=new THREE.MeshPhysicalMaterial({roughness:.28,clearcoat:.6,clearcoatRoughness:.3});
 const cotMat=mat([.86,.83,.55],.55),radMat=new THREE.MeshStandardMaterial({color:lin(.93,.91,.8),roughness:.5,vertexColors:true});
-function beanCluster({count,radius,y,sprouted,coat,heap=0}){
-  const g=new THREE.Group(),pts=[];
-  for(let k=0;pts.length<count&&k<count*60;k++){
-    const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*radius,x=Math.cos(a)*r,z=Math.sin(a)*r;
-    if(pts.every(p=>Math.hypot(p[0]-x,p[1]-z)>(heap?.035:.07))) pts.push([x,z,heap?heap*(1-r/radius)*Math.random():0]);
-  }
-  const n=pts.length,coats=new THREE.InstancedMesh(beanCoatGeo,coatMat,n),cots=sprouted&&new THREE.InstancedMesh(cotGeo,cotMat,n);
-  const rads=sprouted&&RADICLES.map(geo=>new THREE.InstancedMesh(geo,radMat,n)),radCount=[0,0,0,0];
-  const M=new THREE.Matrix4(),L=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),c=new THREE.Color(),one=new THREE.Vector3(1,1,1);
-  pts.forEach(([x,z,h],i)=>{
-    e.set((Math.random()-.5)*.35,Math.random()*Math.PI*2,(Math.random()-.5)*.35); q.setFromEuler(e);
-    M.compose(new THREE.Vector3(x,y+h,z),q,one);
-    coats.setMatrixAt(i,L.copy(M).multiply(new THREE.Matrix4().makeScale(.034,.029,.045)));
-    coats.setColorAt(i,c.copy(lin(...coat[0])).lerp(lin(...coat[1]),Math.random()));
-    if(sprouted){
-      cots.setMatrixAt(i,L.copy(M).multiply(new THREE.Matrix4().compose(new THREE.Vector3(0,.004,.022),new THREE.Quaternion(),new THREE.Vector3(.024,.022,.026))));
-      const v=Math.floor(Math.random()*4); rads[v].setMatrixAt(radCount[v]++,M);
-    }
-  });
-  g.add(coats);
-  if(sprouted){ g.add(cots); rads.forEach((m,v)=>{ m.count=radCount[v]; g.add(m); }); }
-  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
-  return g;
-}
 const SPROUT_COAT=[[.1,.2,.025],[.2,.3,.05]];
 
 
@@ -1130,16 +1105,15 @@ function buildLab(){
     // túi treo: điểm buộc (pivot) ở cổ bình, túi + dây quay quanh điểm đó như con lắc
     const pivot=new THREE.Group(); pivot.position.set(0,HANG_Y,0);
     const sack=wrap(rawGLB[SPEC[9].url].clone(true),{scale:.0068,center:true}); sack.position.y=-POUCH_DROP; pivot.add(sack);   // túi lưới treo đứng
-    if(k===0){ const inner=beanCluster({count:9,radius:.05,y:.035,sprouted:true,coat:SPROUT_COAT,heap:.05}); inner.position.y=-POUCH_DROP; pivot.add(inner); }   // hạt nhìn thấy qua lưới
-    else sack.scale.set(.85,.8,.85);     // túi rỗng xẹp hơn
+    if(k===0) sack.scale.set(1.05,1,2.6);      // túi có hạt: phồng dày ra
+    else sack.scale.set(.85,.8,.85);           // túi rỗng xẹp hơn
     const sackH=new THREE.Box3().setFromObject(sack).getSize(new THREE.Vector3()).y;
     const top=-POUCH_DROP+sackH,cord=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,-top,6),mat([.85,.83,.71],.9)); cord.position.y=top/2; pivot.add(cord);
     pivot.userData={vy:0,ax:0,az:0,vax:0,vaz:0,moving:false}; pivot.visible=false; shadowsFor(pivot); f.add(pivot); L.pouches.push(pivot);
   });
   // túi vải thứ hai (bình 2, không có hạt)
   const bag2=new THREE.Group(); bag2.add(bag.children[0].clone(true)); bag2.userData={item:9,home:new THREE.Vector3(),lift:0,extra:true,foot:bag.userData.foot.slice()}; bag2.visible=false; scene.add(bag2); draggables.push(bag2); L.bag.push(bag2);
-  L.pile=beanCluster({count:26,radius:.17,y:.135,sprouted:true,coat:SPROUT_COAT,heap:.05}); L.pile.visible=false; bag.add(L.pile);
-  L.poured=new THREE.Group(); bag.add(L.poured);                    // hạt rơi thật từ đĩa sẽ nằm ở đây
+  L.filled=0;      // số hạt đã chui vào túi 1 → túi phồng dần
   for(let k=0;k<2;k++){ const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide})); r.rotation.x=-Math.PI/2; r.position.y=.008; r.visible=false; r.renderOrder=2; scene.add(r); L.rings.push(r); }
   lab=L; return L;
 }
@@ -1164,7 +1138,7 @@ function pa1Apply(){
   L.stoppers.forEach((s,k)=>{ reseatStopper(k); s.position.copy(pa1.open[k]?stopperAside(k):s.userData.closed); });
   L.pouches.forEach((p,k)=>{ p.visible=pa1.bagIn[k]; p.position.y=HANG_Y; p.rotation.set(0,0,0); Object.assign(p.userData,{vy:0,ax:0,az:0,vax:0,vaz:0,moving:false}); });
   L.seeds.length=0;
-  L.poured.visible=pa1.seeded; L.pile.visible=pa1.seeded&&!L.poured.children.length;
+  setBagPuff(pa1.seeded?1:0);
   
   setTurbidity(); pa1Rings();
 }
@@ -1196,7 +1170,7 @@ function stepPour(dt){
     while(P.next<=0&&P.spawned<P.total){
       P.next+=.04; P.spawned++;
       const s=oneSprout(),start=new THREE.Vector3(d.position.x+.36,d.position.y+.12,d.position.z+(Math.random()-.5)*.28);
-      const tgt=new THREE.Vector3(b.position.x+(Math.random()-.5)*.36,.104,b.position.z+(Math.random()-.5)*.5),T=.42+Math.random()*.12;
+      const tgt=new THREE.Vector3(b.position.x+(Math.random()-.5)*.4,.12,b.position.z+.22+Math.random()*.08),T=.42+Math.random()*.12;
       const v=new THREE.Vector3((tgt.x-start.x)/T,(tgt.y-start.y+.5*GRAVITY*T*T)/T,(tgt.z-start.z)/T);
       s.position.copy(start); s.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6); scene.add(s);
       L.seeds.push({m:s,v,spin:new THREE.Vector3((Math.random()-.5)*14,(Math.random()-.5)*14,(Math.random()-.5)*14),rest:false,bounced:false});
@@ -1214,22 +1188,29 @@ function stepPour(dt){
   }
   return true;
 }
+/* độ phồng của túi 1 (0 = xẹp, 1 = đầy hạt): kéo dày túi theo chiều cao, hơi co mép lại như vải bị căng */
+const BAG_PUFF=1.6;
+function setBagPuff(f){ if(!lab) return; const w=lab.bag[0].children[0]; w.userData.puff=f; w.scale.set(1-.06*f,1+BAG_PUFF*f,1-.06*f); }
+/* hạt bay theo đường ném xiên tới miệng túi, chạm miệng thì trượt vào trong (thu nhỏ dần, khuất hẳn) */
 function stepSeeds(dt){
   const L=lab; if(!L||!L.seeds.length) return false;
-  const b=L.bag[0];
+  const b=L.bag[0],w=b.children[0];
   for(const s of L.seeds){
     if(s.rest) continue;
+    if(s.in){
+      s.t+=dt; const k=Math.max(0,1-s.t/.16);
+      s.m.scale.setScalar(k); s.m.position.z-=.9*dt; s.m.position.y=Math.max(.04,s.m.position.y-.25*dt);
+      if(s.t>=.16){ s.rest=true; scene.remove(s.m); L.filled++; }
+      continue;
+    }
     s.v.y-=GRAVITY*dt; s.m.position.addScaledVector(s.v,dt);
     s.m.rotation.x+=s.spin.x*dt; s.m.rotation.y+=s.spin.y*dt; s.m.rotation.z+=s.spin.z*dt;
-    // mặt túi + phần hạt đã chất lên (đống cao dần ở giữa)
-    const near=L.poured.children.filter(c=>Math.hypot(c.position.x-(s.m.position.x-b.position.x),c.position.z-(s.m.position.z-b.position.z))<.07).length;
-    const floorY=.104+.028+Math.min(.05,near*.012);
-    if(s.m.position.y<=floorY&&s.v.y<0){
-      s.m.position.y=floorY;
-      if(!s.bounced&&s.v.y<-.6){ s.bounced=true; s.v.y*=-.22; s.v.x*=.35; s.v.z*=.35; s.spin.multiplyScalar(.3); }
-      else{ s.rest=true; s.m.rotation.x=(Math.random()-.5)*.4; s.m.rotation.z=(Math.random()-.5)*.4; L.poured.attach(s.m); L.poured.visible=true; }
-    }
+    const mouthY=.1*w.scale.y+.02;
+    if(s.m.position.y<=mouthY&&s.v.y<0){ s.in=true; s.t=0; }
   }
+  // túi phồng dần theo số hạt đã vào
+  const target=Math.min(1,L.filled/18),cur=w.userData.puff||0;
+  if(Math.abs(target-cur)>.002){ setBagPuff(cur+(target-cur)*(1-Math.exp(-dt*8))); }
   return true;
 }
 
@@ -1379,13 +1360,13 @@ function pa1Exit(){
   if(!pa1.active) return; pa1.active=false; pa1.playing=false;
   const L=lab; stopDrag=null; L.pour=null; L.seeds.forEach(s=>scene.remove(s.m)); L.seeds.length=0; pa1Busy=false;
   draggables.forEach(g=>{ g.visible=!g.userData.extra; if(g.userData.home0){ g.userData.home.copy(g.userData.home0); } g.position.copy(g.userData.home); g.rotation.set(0,0,0); g.userData.lift=0; g.userData.scripted=false; });
-  L.waters.forEach(w=>w.visible=false); L.pouches.forEach(p=>p.visible=false); L.pile.visible=false; L.poured.visible=false;
+  L.waters.forEach(w=>w.visible=false); L.pouches.forEach(p=>p.visible=false); setBagPuff(0);
   L.stoppers.forEach((s,k)=>{ reseatStopper(k); s.position.copy(s.userData.closed); }); L.rings.forEach(r=>r.visible=false);
   tween=true; dirty=true;
 }
 function pa1Restart(){
   Object.assign(pa1,{i:0,hover:null,seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false}); anims.length=0;
-  if(lab){ stopDrag=null; lab.pour=null; lab.seeds.forEach(s=>scene.remove(s.m)); lab.seeds.length=0; lab.poured.clear(); pa1Busy=false; }
+  if(lab){ stopDrag=null; lab.pour=null; lab.seeds.forEach(s=>scene.remove(s.m)); lab.seeds.length=0; lab.filled=0; setBagPuff(0); pa1Busy=false; }
   if(pa1.active){ pa1Apply(); pa1Emit(); }
 }
 function pa1Tick(dt){
