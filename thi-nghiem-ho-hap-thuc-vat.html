@@ -1082,6 +1082,26 @@ function oneSprout(){
   g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
   return g;
 }
+/* Túi vải màn treo trong bình: dài, hẹp, thắt ở miệng; túi có hạt căng phồng lổn nhổn, nhìn rõ hạt qua lớp vải thưa;
+   túi rỗng xẹp thành dải mỏng. Gốc toạ độ ở điểm buộc (dưới nút), túi kéo dài xuống tới trên mặt nước. */
+const gauzeMat=new THREE.MeshStandardMaterial({color:lin(.95,.94,.9),roughness:.95,transparent:true,opacity:.72,side:THREE.DoubleSide,depthWrite:false});
+function gauzeSack(full){
+  const g=new THREE.Group(),prof=[[.035,0],[.06,-.04],[.1,-.16],[.125,-.36],[.13,-.56],[.115,-.68],[.07,-.75],[0,-.77]];
+  const geo=new THREE.LatheGeometry(prof.map(p=>new THREE.Vector2(...p)),28,0,Math.PI*2);
+  const pos=geo.attributes.position,v=new THREE.Vector3();
+  for(let i=0;i<pos.count;i++){      // vải nhăn: túi có hạt lổn nhổn theo hạt bên trong, túi rỗng gợn nhẹ
+    v.fromBufferAttribute(pos,i); const a=Math.atan2(v.z,v.x),bump=full?.09*Math.sin(a*6+v.y*31)*Math.cos(v.y*23+a*2):.04*Math.sin(v.y*40+a*3);
+    v.x*=1+bump; v.z*=(1+bump)*(full?.55:.16); pos.setXYZ(i,v.x,v.y,v.z);
+  }
+  geo.computeVertexNormals();
+  const sack=new THREE.Mesh(geo,gauzeMat); sack.renderOrder=1; sack.position.y=-.04; g.add(sack);
+  if(full) for(let i=0;i<20;i++){      // hạt nảy mầm bên trong, lấp đầy phần thân túi
+    const y=-.16-Math.random()*.5,r=.05*Math.sqrt(Math.random()),a=Math.random()*Math.PI*2,sd=oneSprout();
+    // rễ mầm chúc xuống theo thân túi để không đâm xuyên ra ngoài vải
+    sd.position.set(Math.cos(a)*r*1.1,y,Math.sin(a)*r*.4); sd.rotation.set(Math.PI/2+(Math.random()-.5)*.5,Math.random()*6,(Math.random()-.5)*.5); sd.scale.setScalar(.85); g.add(sd);
+  }
+  return g;
+}
 function buildLab(){
   if(lab) return lab;
   const flasks=(items[3]||[]).slice().sort((a,b)=>a.userData.home.x-b.userData.home.x),bag=items[9]&&items[9][0],dish=items[12]&&items[12][0];
@@ -1093,7 +1113,7 @@ function buildLab(){
     const st=new THREE.Group(),body=f.children[0],corks=[]; body.add(st); f.updateMatrixWorld(true);
     f.traverse(o=>{ if(o.isMesh&&/cork|nut cao su/i.test(o.material.name||o.name||'')) corks.push(o); }); corks.forEach(m=>st.attach(m));
     st.userData.closed=st.position.clone(); st.userData.home=body; L.stoppers.push(st);
-    f.traverse(o=>{ if(o.isMesh&&o.material===glass) o.material=glassThin; });
+    f.traverse(o=>{ if(o.isMesh&&o.material===glass){ o.material=glassThin; o.renderOrder=3; } });   // kính vẽ sau túi vải (cùng là vật trong suốt)
     // nước vôi trong: xuyên sáng, khúc xạ như nước (ior 1,333), hơi ngả xanh ở chỗ dày
     const w=new THREE.Mesh(waterGeo,new THREE.MeshPhysicalMaterial({color:lin(1,1,1),roughness:.02,metalness:0,transmission:1,thickness:.9,ior:1.333,attenuationColor:lin(.8,.93,.95),attenuationDistance:.9,specularIntensity:1,envMapIntensity:1.6}));
     // mặt khum (vạch nước sáng ở mép) + lớp phản chiếu mỏng trên mặt nước — dấu hiệu giúp mắt nhận ra nước trong
@@ -1104,16 +1124,16 @@ function buildLab(){
     w.visible=false; f.add(w); L.waters.push(w);
     // túi treo: điểm buộc (pivot) ở cổ bình, túi + dây quay quanh điểm đó như con lắc
     const pivot=new THREE.Group(); pivot.position.set(0,HANG_Y,0);
-    const sack=wrap(rawGLB[SPEC[9].url].clone(true),{scale:.0068,center:true}); sack.position.y=-POUCH_DROP; pivot.add(sack);   // túi lưới treo đứng
-    if(k===0) sack.scale.set(1.05,1,2.6);      // túi có hạt: phồng dày ra
-    else sack.scale.set(.85,.8,.85);           // túi rỗng xẹp hơn
-    const sackH=new THREE.Box3().setFromObject(sack).getSize(new THREE.Vector3()).y;
-    const top=-POUCH_DROP+sackH,cord=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,-top,6),mat([.85,.83,.71],.9)); cord.position.y=top/2; pivot.add(cord);
+    pivot.add(gauzeSack(k===0));
+    // dây buộc miệng túi kẹp dưới nút, vắt qua miệng bình ra ngoài (như ảnh thật)
+    pivot.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([[0,-.04,0],[.06,.08,.02],[.115,.15,.03],[.15,.13,.04],[.19,-.05,.06],[.23,-.32,.07]].map(p=>new THREE.Vector3(...p))),40,.005,6),mat([.95,.95,.92],.8)));
     pivot.userData={vy:0,ax:0,az:0,vax:0,vaz:0,moving:false}; pivot.visible=false; shadowsFor(pivot); f.add(pivot); L.pouches.push(pivot);
   });
+  L.filled=0;      // số hạt đã chui vào túi 1 → túi phồng dần
+  bag.children[0].traverse(o=>{ if(o.isMesh){ o.material=o.material.clone(); Object.assign(o.material,{transparent:true,opacity:.62,depthWrite:false}); o.renderOrder=1; } });   // vải màn hơi trong
+  L.inside=new THREE.Group(); bag.add(L.inside);      // hạt đã vào túi 1 (nằm trong lòng túi)
   // túi vải thứ hai (bình 2, không có hạt)
   const bag2=new THREE.Group(); bag2.add(bag.children[0].clone(true)); bag2.userData={item:9,home:new THREE.Vector3(),lift:0,extra:true,foot:bag.userData.foot.slice()}; bag2.visible=false; scene.add(bag2); draggables.push(bag2); L.bag.push(bag2);
-  L.filled=0;      // số hạt đã chui vào túi 1 → túi phồng dần
   for(let k=0;k<2;k++){ const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide})); r.rotation.x=-Math.PI/2; r.position.y=.008; r.visible=false; r.renderOrder=2; scene.add(r); L.rings.push(r); }
   lab=L; return L;
 }
@@ -1138,7 +1158,7 @@ function pa1Apply(){
   L.stoppers.forEach((s,k)=>{ reseatStopper(k); s.position.copy(pa1.open[k]?stopperAside(k):s.userData.closed); });
   L.pouches.forEach((p,k)=>{ p.visible=pa1.bagIn[k]; p.position.y=HANG_Y; p.rotation.set(0,0,0); Object.assign(p.userData,{vy:0,ax:0,az:0,vax:0,vaz:0,moving:false}); });
   L.seeds.length=0;
-  setBagPuff(pa1.seeded?1:0);
+  setBagPuff(pa1.seeded?1:0); L.inside.visible=pa1.seeded;
   
   setTurbidity(); pa1Rings();
 }
@@ -1189,7 +1209,7 @@ function stepPour(dt){
   return true;
 }
 /* độ phồng của túi 1 (0 = xẹp, 1 = đầy hạt): kéo dày túi theo chiều cao, hơi co mép lại như vải bị căng */
-const BAG_PUFF=1.6;
+const BAG_PUFF=1.2;
 function setBagPuff(f){ if(!lab) return; const w=lab.bag[0].children[0]; w.userData.puff=f; w.scale.set(1-.06*f,1+BAG_PUFF*f,1-.06*f); }
 /* hạt bay theo đường ném xiên tới miệng túi, chạm miệng thì trượt vào trong (thu nhỏ dần, khuất hẳn) */
 function stepSeeds(dt){
@@ -1197,16 +1217,19 @@ function stepSeeds(dt){
   const b=L.bag[0],w=b.children[0];
   for(const s of L.seeds){
     if(s.rest) continue;
-    if(s.in){
-      s.t+=dt; const k=Math.max(0,1-s.t/.16);
-      s.m.scale.setScalar(k); s.m.position.z-=.9*dt; s.m.position.y=Math.max(.04,s.m.position.y-.25*dt);
-      if(s.t>=.16){ s.rest=true; scene.remove(s.m); L.filled++; }
+    if(s.in){        // trượt qua miệng túi vào lòng túi, nằm lại bên trong
+      s.t+=dt; const k=Math.min(1,s.t/.3),e=k*(2-k);
+      s.m.position.lerpVectors(s.from,s.to,e); s.m.rotation.x+=(s.rx-s.m.rotation.x)*.2; s.m.rotation.z+=(s.rz-s.m.rotation.z)*.2;
+      if(k>=1){ s.rest=true; L.inside.attach(s.m); L.inside.visible=true; L.filled++; }
       continue;
     }
     s.v.y-=GRAVITY*dt; s.m.position.addScaledVector(s.v,dt);
     s.m.rotation.x+=s.spin.x*dt; s.m.rotation.y+=s.spin.y*dt; s.m.rotation.z+=s.spin.z*dt;
     const mouthY=.1*w.scale.y+.02;
-    if(s.m.position.y<=mouthY&&s.v.y<0){ s.in=true; s.t=0; }
+    if(s.m.position.y<=mouthY&&s.v.y<0){
+      s.in=true; s.t=0; s.from=s.m.position.clone(); s.rx=(Math.random()-.5)*.6; s.rz=(Math.random()-.5)*.6;
+      s.to=new THREE.Vector3(b.position.x-.03+(Math.random()-.5)*.34,.035+Math.random()*.08,b.position.z-.2+Math.random()*.3);
+    }
   }
   // túi phồng dần theo số hạt đã vào
   const target=Math.min(1,L.filled/18),cur=w.userData.puff||0;
@@ -1360,13 +1383,13 @@ function pa1Exit(){
   if(!pa1.active) return; pa1.active=false; pa1.playing=false;
   const L=lab; stopDrag=null; L.pour=null; L.seeds.forEach(s=>scene.remove(s.m)); L.seeds.length=0; pa1Busy=false;
   draggables.forEach(g=>{ g.visible=!g.userData.extra; if(g.userData.home0){ g.userData.home.copy(g.userData.home0); } g.position.copy(g.userData.home); g.rotation.set(0,0,0); g.userData.lift=0; g.userData.scripted=false; });
-  L.waters.forEach(w=>w.visible=false); L.pouches.forEach(p=>p.visible=false); setBagPuff(0);
+  L.waters.forEach(w=>w.visible=false); L.pouches.forEach(p=>p.visible=false); setBagPuff(0); L.inside.visible=false;
   L.stoppers.forEach((s,k)=>{ reseatStopper(k); s.position.copy(s.userData.closed); }); L.rings.forEach(r=>r.visible=false);
   tween=true; dirty=true;
 }
 function pa1Restart(){
   Object.assign(pa1,{i:0,hover:null,seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false}); anims.length=0;
-  if(lab){ stopDrag=null; lab.pour=null; lab.seeds.forEach(s=>scene.remove(s.m)); lab.seeds.length=0; lab.filled=0; setBagPuff(0); pa1Busy=false; }
+  if(lab){ stopDrag=null; lab.pour=null; lab.seeds.forEach(s=>scene.remove(s.m)); lab.seeds.length=0; lab.filled=0; lab.inside.clear(); setBagPuff(0); pa1Busy=false; }
   if(pa1.active){ pa1Apply(); pa1Emit(); }
 }
 function pa1Tick(dt){
