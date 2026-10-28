@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Thí nghiệm về hô hấp ở thực vật | YooBook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;800&display=swap">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<script type="importmap">{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}</script>
+<style>
+/* =====================================================================================================
+   GIAO DIỆN CHUẨN MODULE 3D YooBook — bố cục theo bài "Quan sát tế bào biểu bì hành"
+   · Cụm icon góc TRÊN TRÁI (.stage-tools)      · Menu bước góc TRÊN PHẢI (.steps)
+   · Chấm số ghi chú dụng cụ (.pins) + bong bóng thông tin (.part-card.tip)
+   · Thẻ nhiệm vụ (#panel) + cụm nút (#actionBar) góc DƯỚI PHẢI · Bước 3: phiếu thực hành (.sheet-wrap)
+   ===================================================================================================== */
+
+/* ---------- 1. Biến & nền ---------- */
+:root{
+  --brand:#195658;--brand-dark:#0f3f3d;--brand-light:#2f827d;--brand-soft:#e6f0ee;
+  --y-ink:#10302E;--y-ink2:#2C4745;--y-mute:#4A6461;--y-line:#DCE6E4;--y-lime:#C8F04A;--y-lime-b:#A8D62A;--y-lime-soft:#E7F2D0;
+  --y-btn:#0E5A55;--y-btn-h:#0A4743;--y-shadow:0 4px 16px rgba(0,0,0,.18);--danger:#B3261E;
+  --sh-1:0 1px 2px rgba(13,42,40,.05);--sh-2:0 2px 6px rgba(13,42,40,.06),0 18px 34px -22px rgba(13,42,40,.45);--sh-3:0 10px 30px -12px rgba(13,42,40,.32);
+  --step-w:290px;--panel-w:340px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:'Roboto','Segoe UI',system-ui,-apple-system,Arial,sans-serif;font-size:15px;line-height:1.5;color:var(--y-ink);background:var(--brand);overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+button,input,textarea,select{font-family:inherit}
+button{font:inherit}
+button:focus-visible,a:focus-visible,.pin:focus-visible{outline:3px solid #2B7FD6;outline-offset:2px}
+.b{font-weight:700;color:var(--y-ink)}
+
+/* ---------- 2. Màn giới thiệu ---------- */
+.intro-loader{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 42%,#2b7a77 0%,#195658 46%,#0a2928 100%);transition:opacity .5s ease}
+.intro-loader::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at center,rgba(255,255,255,.12),transparent 42%),linear-gradient(180deg,rgba(255,255,255,.08),rgba(8,26,26,.08) 20%,rgba(8,26,26,.45) 100%);pointer-events:none}
+.intro-loader.hide{opacity:0;pointer-events:none}
+.intro-wrap{position:relative;z-index:1;width:min(1000px,calc(100vw - 40px));display:flex;flex-direction:column;align-items:center;text-align:center}
+.intro-card{width:min(900px,calc(100vw - 40px));padding:26px 20px 18px}
+.intro-kicker{font-size:13px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.92)}
+.intro-card h1{margin:10px 0 14px;font-size:clamp(32px,5vw,64px);line-height:1.06;color:#fff;text-shadow:0 6px 22px rgba(0,0,0,.35)}
+.intro-sub{margin:0 auto;color:rgba(255,255,255,.94);font-size:clamp(16px,2vw,21px);max-width:760px;text-shadow:0 4px 14px rgba(0,0,0,.25)}
+.intro-progress{height:7px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden;margin:22px auto 12px;max-width:420px}
+.intro-progress span{display:block;height:100%;width:8%;background:linear-gradient(90deg,#f1df76,#d9c84d);border-radius:99px;transition:width .4s ease}
+.intro-meta{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:14px;color:rgba(255,255,255,.88);max-width:420px;margin:0 auto}
+.ready-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#97e6d2;box-shadow:0 0 0 5px rgba(151,230,210,.18);margin-right:8px}
+.intro-explore{width:min(360px,100%);margin-top:24px;border:1px solid rgba(255,255,255,.3);border-radius:18px;background:linear-gradient(180deg,rgba(25,86,88,.96),rgba(22,103,101,.96));color:#fff;padding:15px 18px;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 18px 40px rgba(0,0,0,.24)}
+.intro-explore:disabled{opacity:.65;cursor:wait}
+.intro-credit{color:rgba(255,255,255,.88);font-size:13px;margin-top:16px;text-shadow:0 3px 12px rgba(0,0,0,.28)}
+
+/* ---------- 3. Khung trang ---------- */
+.app{height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;border-bottom:1px solid var(--y-line);box-shadow:var(--sh-1);z-index:20;flex:0 0 auto}
+.logo{height:27px;display:block;flex:0 0 auto}
+.titles{flex:1;min-width:0}
+.badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--brand);background:var(--brand-soft);border-radius:99px;padding:2px 9px;margin-bottom:2px}
+.titles h1{margin:0;font-weight:700;color:var(--y-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.titles h1.lg{font-size:18px}.titles h1.sm{font-size:15px;display:none}
+.tb-btn{width:38px;height:38px;border-radius:11px;border:1px solid var(--y-line);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--brand-dark);flex:0 0 auto}
+.tb-btn:hover{background:var(--brand-soft);border-color:var(--brand-light)}
+.main{flex:1;min-height:0;display:flex;flex-direction:column;padding:14px;overflow:hidden}
+.frame{position:relative;background:#fff;border-radius:16px;box-shadow:var(--sh-2);display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.stage{position:relative;flex:1;min-height:0;background:var(--brand);overflow:hidden;touch-action:none}
+.stage canvas#scene{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.stage canvas#scene:active{cursor:grabbing}
+.vignette{position:absolute;inset:0;z-index:1;pointer-events:none;box-shadow:inset 0 0 96px rgba(4,28,27,.16)}
+.error{position:absolute;inset:40% 10% auto;z-index:10;text-align:center;line-height:1.7;background:#fff;color:var(--y-ink);padding:20px;border-radius:14px;font-size:14px;box-shadow:var(--y-shadow)}
+.error[hidden]{display:none}
+.cam-hint{display:none;position:absolute;left:16px;bottom:16px;z-index:5;padding:7px 12px;border-radius:99px;background:rgba(16,48,46,.82);color:#fff;font-size:12px;pointer-events:none}
+@media (min-width:1000px){.cam-hint{display:block}}
+
+/* ---------- 4. Cụm icon góc trên trái ---------- */
+.stage-tools{position:absolute;left:16px;top:16px;z-index:6;display:flex;align-items:center;gap:2px;padding:4px;border-radius:14px;background:#fff;box-shadow:var(--y-shadow)}
+.ghost{width:44px;height:44px;padding:0;display:grid;place-items:center;border:none;background:transparent;color:var(--y-ink);border-radius:10px;cursor:pointer}
+.ghost svg{width:20px;height:20px}
+.ghost:hover{background:#EEF3F2}
+.ghost[aria-pressed="true"]{background:var(--y-lime-soft);color:var(--y-btn)}
+.tdiv{width:1px;height:24px;background:var(--y-line);margin:0 4px;flex:0 0 auto}
+
+/* ---------- 5. Menu bước góc trên phải ---------- */
+.steps{position:absolute;right:16px;top:16px;z-index:15;display:flex;flex-direction:column;gap:10px}
+.steps .step{display:flex;align-items:center;gap:12px;width:var(--step-w);min-height:50px;padding:0 16px 0 12px;border:2.5px solid #fff;border-radius:14px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.16);cursor:pointer;font-size:15px;font-weight:700;line-height:1.3;color:var(--y-ink);text-align:left}
+.steps .step b{flex:0 0 auto;width:26px;height:26px;border-radius:99px;background:#E9EFED;color:var(--y-ink);font-size:13px;display:flex;align-items:center;justify-content:center}
+.steps .step span{flex:1;min-width:0}
+.steps .step[aria-pressed="true"]{background:#D7F35A;border-color:#7FB23A}
+.steps .step[aria-pressed="true"] b{background:rgba(255,255,255,.55)}
+.steps .step.done:not([aria-pressed="true"]) b{background:var(--y-btn);color:#fff}
+
+/* ---------- 6. Chấm số ghi chú dụng cụ ---------- */
+.leaders{position:absolute;inset:0;width:100%;height:100%;z-index:4;pointer-events:none;overflow:hidden}
+.leaders line{stroke:#d8ff64;stroke-width:1.6;stroke-dasharray:5 4;stroke-linecap:round;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.7))}
+.leaders circle{fill:#d8ff64;stroke:#fff;stroke-width:1.5}
+.pins{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.pin{position:absolute;left:0;top:0;display:flex;align-items:center;gap:6px;padding:0;border:none;border-radius:99px;background:transparent;color:#fff;font:600 13px/1.2 Roboto,system-ui,sans-serif;white-space:nowrap;pointer-events:auto;cursor:pointer;will-change:transform}
+.pin::after{content:'';position:absolute;inset:-6px}
+.pin b{width:34px;height:34px;border-radius:99px;display:grid;place-items:center;border:2px solid #fff;background:var(--y-lime);color:var(--y-ink);font-size:13px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.pin.seen b{background:#fff;color:var(--y-btn)}
+.pin.on b{background:var(--y-ink);color:var(--y-lime)}
+.pin span{display:none}
+.pins.names .pin{padding:0 12px 0 0;background:rgba(16,48,46,.9)}
+.pins.names .pin span{display:inline}
+.pin[hidden]{display:none}
+
+/* ---------- 7. Bong bóng thông tin dụng cụ ---------- */
+.part-card{position:absolute;left:0;top:0;z-index:12;display:none;width:320px;max-width:calc(100% - 16px);padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.98);box-shadow:0 10px 28px rgba(0,0,0,.3);will-change:transform}
+.part-card.show{display:block}
+.part-card .pc-body{padding-right:34px}
+.part-card .pc-kick{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--y-mute)}
+.part-card h3{margin:4px 0;font-size:15px;color:var(--y-ink)}
+.part-card .pc-desc{font-size:13px;line-height:1.45;color:var(--y-ink2)}
+.part-card .pc-x{position:absolute;top:10px;right:10px;width:28px;height:28px;border:none;border-radius:99px;background:#EEF3F2;color:var(--y-ink);font-size:14px;cursor:pointer}
+.part-card .pc-x:hover{background:#DCE6E4}
+
+/* ---------- 8. Thẻ nhiệm vụ + cụm nút góc dưới phải ---------- */
+.dock{height:0;flex:0 0 auto}
+.dock .panel{position:absolute;right:16px;bottom:calc(16px + var(--ab-h,0px));z-index:14;display:none;width:var(--panel-w);max-width:calc(100% - 32px);padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.97);box-shadow:var(--y-shadow);flex-direction:column;gap:6px}
+.dock .panel.show{display:flex;animation:panelIn .35s ease}
+@keyframes panelIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.panel-k{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--y-mute)}
+.panel-t{font-size:14px;line-height:1.4;font-weight:700;color:var(--y-ink)}
+.panel-t .ttl{font-size:14px;font-weight:700}
+.panel-t .gd{font-size:12.5px;line-height:1.5;font-weight:400;color:var(--y-ink2);margin-top:2px}
+.panel-x{font-size:12px;line-height:1.45;color:var(--y-ink2)}
+.panel-x:empty{display:none}
+.trow{display:flex;align-items:center;gap:8px}
+.tk{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--y-mute);white-space:nowrap}
+.seg{display:flex;gap:2px;flex:1}.seg i{flex:1;height:4px;border-radius:99px;background:#DCE6E4}.seg i.on{background:#8DBF1E}.seg i.now{background:var(--y-btn)}
+.back{flex:0 0 auto;width:28px;height:28px;border:1px solid #DCE6E4;border-radius:99px;background:#fff;color:var(--y-ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.back[disabled]{opacity:.4;cursor:default}
+.hint{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--y-mute)}
+.meter{display:flex;align-items:center;gap:4px;margin-top:2px}.meter i{flex:1;height:6px;border-radius:99px;background:#DCE6E4;transition:background .25s}.meter i.on{background:#8DBF1E}.meter b{min-width:40px;text-align:right;font-size:12px;color:var(--y-ink)}
+.note{margin:2px 0 0;padding:7px 10px;border-radius:10px;background:#FFF4E0;color:#8A4B00;font-size:12px;line-height:1.45}
+/* chọn thí nghiệm / phương án */
+.xseg{display:flex;gap:3px;padding:3px;background:#EEF3F2;border-radius:10px}
+.xseg button{flex:1 1 0;min-height:30px;padding:4px 6px;border:0;border-radius:8px;background:transparent;color:var(--y-ink);font-size:12px;font-weight:700;line-height:1.2;cursor:pointer}
+.xseg button[aria-pressed="true"]{background:var(--y-ink);color:var(--y-lime)}
+.xseg.sub button[aria-pressed="true"]{background:#fff;color:var(--y-btn);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 24px;border-radius:99px;border:none;background:var(--y-btn);color:#fff;font-weight:700;font-size:14px;cursor:pointer;transition:transform .15s,background .2s}
+.btn:hover{background:var(--y-btn-h)}.btn:active{transform:scale(.97)}
+.btn.alt{background:#fff;color:var(--y-btn);border:1px solid var(--y-line)}.btn.alt:hover{background:#EEF3F2}
+.action-bar{position:absolute;right:16px;bottom:16px;z-index:13;display:none;gap:6px;padding:6px;border-radius:16px;background:#fff;box-shadow:var(--y-shadow);max-width:calc(100% - 32px);justify-content:flex-end}
+.action-bar.show{display:flex}
+.action-bar .btn{min-height:44px;padding:10px 18px;font-size:13px;white-space:nowrap;border-radius:12px}
+.action-bar .btn:not(.alt):not([disabled]){animation:actPulse 2.2s ease-in-out infinite}
+.action-bar .btn:hover,.action-bar .btn:focus-visible{animation:none}
+.action-bar .btn[disabled]{background:#D3DEDB;color:#4E6461;cursor:not-allowed;animation:none}
+@keyframes actPulse{0%,100%{box-shadow:0 0 0 0 rgba(216,255,100,0)}50%{box-shadow:0 0 0 7px rgba(216,255,100,.45),0 0 18px 2px rgba(216,255,100,.4)}}
+
+/* ---------- 9. Bước 3 · Phiếu thực hành ---------- */
+.sheet-wrap{--aw:290px;position:absolute;inset:0;z-index:12;display:none;background:#EEF3F2;overflow:auto;padding:16px;color:var(--y-ink)}
+.sheet-wrap.show{display:block;animation:pop .3s ease}
+@keyframes pop{from{transform:scale(.98);opacity:0}to{transform:none;opacity:1}}
+.sheet-layout{display:flex;gap:16px;align-items:flex-start}
+.sheet-aside{flex:0 0 var(--aw);width:var(--aw);padding-top:186px;display:flex;flex-direction:column;gap:12px;position:sticky;top:0}
+.sheet-res{padding:16px;background:#fff;border-radius:16px;display:flex;flex-direction:column;gap:12px}
+.sheet-res .k{font-size:12px;font-weight:700;color:var(--y-mute);letter-spacing:.05em}
+.sheet-res img{width:100%;aspect-ratio:4/3;border-radius:12px;object-fit:cover;background:var(--brand);display:block}
+.sheet-res .btn{width:100%;min-height:44px;border-radius:12px;font-size:14px}
+.sheet-toc{display:flex;flex-direction:column;gap:4px}
+.sheet-toc a{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;color:var(--y-ink);text-decoration:none;font-size:13px;font-weight:600}
+.sheet-toc a:hover{background:#EEF3F2}
+.sheet-toc a b{width:22px;height:22px;border-radius:99px;background:#E9EFED;display:grid;place-items:center;font-size:11px}
+.sheet-main{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:14px}
+.sheet-paper{background:#fff;border-radius:18px;padding:32px;box-shadow:0 2px 10px rgba(16,48,46,.06);display:flex;flex-direction:column;gap:18px}
+.sheet-head{display:flex;flex-direction:column;gap:4px}
+.sheet-kick{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--y-mute)}
+.sheet-head h2{margin:0;font-size:28px;font-weight:700;letter-spacing:-.01em}
+.sheet-info{display:flex;gap:12px;flex-wrap:wrap}
+.sheet-info label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;flex:1 1 240px}
+.sheet-info label.cls{flex:0 1 180px}
+.sheet-info input,.sheet-table input{width:100%;min-width:0;height:44px;padding:0 12px;border:1.5px solid #D3DEDB;border-radius:10px;font:400 15px Roboto,'Segoe UI',sans-serif;color:var(--y-ink);background:#fff;outline:none}
+.sheet-table input{height:40px;font-size:14px}
+.sheet-wrap input:focus,.sheet-wrap textarea:focus,.modal textarea:focus{border-color:var(--y-btn);box-shadow:0 0 0 3px rgba(14,90,85,.15)}
+.sheet-sec{display:flex;flex-direction:column;gap:12px;padding-top:18px;border-top:1px solid var(--y-line);scroll-margin-top:16px}
+.sec-k{display:inline-flex;align-self:flex-start;padding:4px 10px;border-radius:99px;background:var(--y-lime-soft);color:var(--y-btn);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.sheet-sec h3{margin:0;font-size:18px;line-height:1.35}
+.sheet-sec h4{margin:6px 0 0;font-size:15px;color:var(--y-ink2)}
+.sheet-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.sheet-table th,.sheet-table td{border:1px solid var(--y-line);padding:10px;vertical-align:top}
+.sheet-table th{background:#F4F8F7;padding:12px;font-size:14px;font-weight:700;text-align:left}
+.sheet-table thead th:first-child,.sheet-table tbody th{width:200px}
+.sheet-table tbody th{font-weight:600}
+.sheet-table tbody th small{display:block;font-weight:400;color:var(--y-mute);font-size:12px;margin-top:2px}
+.sheet-wrap textarea,.modal textarea{width:100%;min-height:76px;padding:10px 12px;border:1.5px solid #D3DEDB;border-radius:10px;font:400 14px/1.5 Roboto,'Segoe UI',sans-serif;color:var(--y-ink);background:#fff;resize:vertical;outline:none;display:block}
+.sheet-wrap textarea.short{min-height:52px}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+.addrow{align-self:flex-start;height:40px;padding:0 14px;border:1.5px dashed #A9BDB9;border-radius:10px;background:#FBFDFC;color:var(--y-btn);font-size:13px;font-weight:700;cursor:pointer}
+.addrow:hover{background:var(--y-lime-soft)}
+.chartbox{border:1.5px solid var(--y-line);border-radius:12px;background:#FBFDFC;padding:8px}
+.chartbox canvas{display:block;width:100%;height:180px}
+.trend{display:flex;gap:3px;padding:3px;background:#EEF3F2;border-radius:10px;flex-wrap:wrap}
+.trend button{flex:1 1 0;min-width:64px;min-height:36px;padding:4px 6px;border:0;border-radius:8px;background:transparent;color:var(--y-ink);font-size:12px;font-weight:600;line-height:1.2;cursor:pointer}
+.trend button:hover{background:#fff}
+.trend button[aria-pressed="true"]{background:var(--y-ink);color:var(--y-lime)}
+.trend button[data-v="-2"][aria-pressed="true"],.trend button[data-v="-1"][aria-pressed="true"]{background:#8A2E25;color:#fff}
+.trend button[data-v="0"][aria-pressed="true"]{background:#56645F;color:#fff}
+.sheet-foot{margin:0;font-size:13px;color:var(--y-mute)}
+.sheet-actions{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px;background:#fff;border-radius:16px;box-shadow:0 -2px 12px rgba(16,48,46,.08)}
+.sheet-actions .grp{display:flex;align-items:center;gap:12px}
+.sheet-actions .btn{min-height:44px;padding:0 18px;font-size:14px;border-radius:12px}
+.sheet-actions .btn.alt{border:1.5px solid var(--y-line);color:var(--y-ink)}
+.sheet-msg{font-size:13px;color:var(--y-mute)}
+.sheet-msg[data-s]{font-weight:600;color:#1C5A34}
+@media (min-width:821px){.frame:has(.stage[data-step="2"]) .steps{left:16px;right:auto}}
+.sec-ok{margin:0;font-size:13px;font-weight:600;color:#1C5A34}
+/* ---------- Thí nghiệm 1 · phương án 1: nhãn nổi, đồng hồ tua nhanh, thông báo, phiếu bật lên ---------- */
+.tags{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+.tag{position:absolute;left:0;top:0;padding:5px 11px;border-radius:99px;background:rgba(16,48,46,.88);color:#fff;font:600 12.5px/1.2 Roboto,system-ui,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3);will-change:transform}
+.tag.ok::before{content:'✓ ';color:var(--y-lime)}
+.tag[hidden]{display:none}
+.clock{position:absolute;left:16px;top:76px;z-index:7;display:none;align-items:center;gap:10px;padding:8px 14px;border-radius:14px;background:#fff;box-shadow:var(--y-shadow);font-weight:700;font-size:15px;color:var(--y-ink);font-variant-numeric:tabular-nums}
+.clock.show{display:flex}
+.clock .bar{width:120px;height:6px;border-radius:99px;background:#DCE6E4;overflow:hidden}.clock .bar i{display:block;height:100%;background:linear-gradient(90deg,#8DBF1E,var(--y-btn))}
+.clock small{font-size:11px;font-weight:600;color:var(--y-mute)}
+.toast{position:absolute;left:16px;bottom:56px;z-index:20;display:none;max-width:calc(100% - 32px);padding:9px 16px;border-radius:12px;background:rgba(16,48,46,.94);color:#fff;font-size:13px;font-weight:600;box-shadow:var(--y-shadow)}
+.toast.show{display:block;animation:panelIn .25s ease}
+.toast.warn{background:#8A4B00}
+.modal{position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(6,24,22,.72)}
+.modal[hidden]{display:none}
+.modal-card{width:min(720px,100%);max-height:100%;overflow:auto;padding:24px 26px;border-radius:20px;background:#fff;box-shadow:0 12px 40px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:14px;animation:pop .3s ease}
+.modal-card h2{margin:0;font-size:20px;line-height:1.35}
+.modal-card p.lead{margin:0;font-size:14px;color:var(--y-ink2)}
+.modal-msg{margin:0;font-size:13px;font-weight:600;color:var(--danger)}
+.modal-msg:empty{display:none}
+.modal-act{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.modal-act .btn{min-height:46px;border-radius:12px}
+.modal textarea.miss{border-color:var(--danger)}
+.panel .quick-act{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:0 12px;border:1px solid var(--y-btn);border-radius:10px;color:var(--y-btn);font-size:12px;font-weight:700;text-decoration:none;background:#fff;cursor:pointer}
+.panel .quick-act:hover{background:var(--y-lime-soft)}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+@media (max-width:620px){.clock{left:auto;right:8px;top:52px;font-size:13px;padding:6px 10px}.clock .bar{width:60px}.toast{left:8px;right:8px;bottom:8px}.modal{padding:0;align-items:flex-end}.modal-card{border-radius:20px 20px 0 0;max-height:92%;padding:18px 16px}}
+@media (min-width:621px) and (max-width:1100px){.sheet-wrap{--aw:260px}.sheet-paper{padding:22px}.sheet-table thead th:first-child,.sheet-table tbody th{width:150px}}
+@media (min-width:621px) and (max-width:820px){.sheet-wrap{padding-top:186px}.sheet-aside{display:none}}
+@media print{
+  @page{margin:14mm}
+  html,body,.app,.main,.frame{height:auto;overflow:visible;background:#fff;box-shadow:none;display:block;padding:0}
+  .topbar,.stage,.steps,.dock,.action-bar,.part-card,.sheet-aside,.sheet-actions,.addrow,.intro-loader{display:none!important}
+  .sheet-wrap{position:static;display:block!important;overflow:visible;background:#fff;padding:0}
+  .sheet-paper{box-shadow:none;padding:0}
+  .sheet-sec{break-inside:avoid}
+}
+
+/* ---------- 10. Máy tính bảng ---------- */
+@media (min-width:621px) and (max-width:1100px){
+  :root{--step-w:250px;--panel-w:310px}
+  .steps .step{font-size:14px}
+  .stage-tools{left:12px;top:12px}.steps{right:12px;top:12px}
+  .dock .panel{right:12px}.action-bar{right:12px;bottom:12px}
+  .part-card{width:280px}
+  .pin b{width:30px;height:30px;font-size:12px}
+}
+@media (min-width:1700px){.panel-t .ttl{font-size:15px}.panel-t .gd{font-size:13.5px}}
+
+/* ---------- 11. Điện thoại: khung 3D ở trên, thông tin + nút ở dưới ---------- */
+@media (max-width:620px){
+  .topbar{padding:8px 10px;gap:8px}.logo{height:22px}.badge{font-size:10px}
+  .titles h1.lg{display:none}.titles h1.sm{display:block;font-size:13px}
+  .tb-btn{width:34px;height:34px}
+  .main{padding:0}
+  .frame{border-radius:0;padding-top:56px;background:#EEF3F2}
+  .stage{flex:0 0 auto;height:clamp(300px,50dvh,440px)}
+  .stage-tools{left:8px;top:8px;padding:3px;border-radius:11px;gap:0}
+  .ghost{width:34px;height:34px;border-radius:8px}.ghost svg{width:16px;height:16px}
+  .tdiv{height:18px;margin:0 3px}
+  .pin b{width:28px;height:28px;font-size:12px}.pin::after{inset:-8px}
+  /* menu bước thu thành 1 ô "Tên bước · n/3 ▾" */
+  .steps{left:8px;right:8px;top:6px;z-index:40;gap:8px}
+  .steps .step{width:100%;min-height:44px;font-size:14px}
+  .steps:not(.open) .step:not([aria-pressed="true"]){display:none}
+  .steps .step[aria-pressed="true"]::after{content:'· ' attr(data-n) '/3';flex:0 0 auto;font-size:12px;font-weight:700}
+  .steps .step[aria-pressed="true"]::before{content:'';order:3;flex:0 0 auto;width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);margin-left:2px;transition:transform .2s}
+  .steps.open .step[aria-pressed="true"]::before{transform:rotate(-135deg)}
+  .steps.open{background:#fff;padding:8px;box-shadow:var(--y-shadow);border-radius:18px}
+  .steps.open .step{box-shadow:none;border-color:#EEF3F2}.steps.open .step[aria-pressed="true"]{border-color:#7FB23A}
+  .frame{overflow:auto}
+  .dock{height:auto;order:1}
+  .dock .panel{position:static;width:auto;max-width:none;margin:8px 12px 0;border:1px solid var(--y-line);box-shadow:none;animation:none}
+  .dock .panel.show{animation:none}
+  .frame:has(.part-card.show) .dock .panel{display:none}
+  .part-card{position:static;order:2;width:auto;max-width:none;margin:8px 12px 0;transform:none!important;box-shadow:none;border:1px solid var(--y-line)}
+  .action-bar{position:sticky;bottom:0;order:9;margin-top:auto;width:100%;max-width:none;padding:8px 12px;border-radius:0;box-shadow:none;border-top:1px solid var(--y-line)}
+  .action-bar .btn{flex:1 1 0;min-width:0;white-space:normal;line-height:1.2;font-size:13px}
+  .sheet-wrap{top:56px;padding:4px 12px 12px}
+  .sheet-layout{flex-direction:column;gap:12px}
+  .sheet-aside{position:static;width:100%;flex:none;padding-top:0}
+  .sheet-res{flex-direction:row;align-items:center;padding:10px 12px;border-radius:14px}
+  .sheet-res .k,.sheet-res.toc{display:none}
+  .sheet-res img{width:72px;flex:0 0 auto}
+  .sheet-res .btn{width:auto;flex:1 1 auto}
+  .sheet-paper{padding:18px 16px;gap:16px;border-radius:16px}
+  .sheet-head h2{font-size:22px}
+  .sheet-info{flex-wrap:nowrap;gap:10px}.sheet-info label{flex:1 1 0;min-width:0}.sheet-info label.cls{flex:0 0 110px}
+  .sheet-table.stack,.sheet-table.stack tbody,.sheet-table.stack tr,.sheet-table.stack th,.sheet-table.stack td{display:block;width:auto!important;border:0;padding:0;background:none}
+  .sheet-table.stack thead{display:none}
+  .sheet-table.stack tr{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .sheet-table.stack td[data-l]::before{content:attr(data-l);display:block;font-size:12px;font-weight:600;color:var(--y-mute);margin-bottom:4px}
+  .sheet-table thead th:first-child,.sheet-table tbody th{width:110px}
+  .sheet-actions{bottom:-12px;margin:0 -12px -12px;border-radius:0;box-shadow:none;border-top:1px solid var(--y-line);padding:12px 16px 20px}
+  .sheet-actions .grp{display:contents}
+  .sheet-actions .btn{min-height:52px;border-radius:14px;font-size:15px}
+  .sheet-actions .btn.alt{width:52px;padding:0;flex:0 0 auto}.sheet-actions .btn.alt .t{display:none}
+  .sheet-actions #shPrint{flex:1 1 0}
+  .sheet-msg{order:-1;flex:1 0 100%}.sheet-msg:not([data-s]){display:none}
+  .intro-card h1{font-size:clamp(28px,8vw,40px)}.intro-explore{font-size:17px}
+}
+@media (max-height:520px) and (min-width:621px){
+  .topbar{padding:4px 12px}.logo{height:20px}.badge{display:none}.titles h1.lg{font-size:14px}.tb-btn{width:30px;height:30px}
+  .main{padding:6px}
+  .steps .step{min-height:34px;font-size:12px;border-width:2px}.steps{gap:4px}.steps .step b{width:20px;height:20px;font-size:11px}
+  .ghost{width:34px;height:34px}
+  .action-bar .btn{min-height:36px;padding:6px 14px}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="intro-loader" id="introLoader" aria-live="polite">
+  <div class="intro-wrap">
+    <section class="intro-card" aria-labelledby="introTitle">
+      <div class="intro-kicker">Khoa học tự nhiên · Chủ đề 10</div>
+      <h1 id="introTitle">Thí nghiệm về hô hấp ở thực vật</h1>
+      <p class="intro-sub">Em quan sát dụng cụ trên bàn thí nghiệm 3D, tiến hành thí nghiệm chứng minh hạt nảy mầm hô hấp thải khí CO₂ rồi hoàn thành phiếu thực hành.</p>
+      <div class="intro-progress" aria-hidden="true"><span id="introBar"></span></div>
+      <div class="intro-meta"><div id="introStatus"><span class="ready-dot"></span>Đang chuẩn bị mô hình 3D…</div><div>3 bước</div></div>
+      <button class="intro-explore" id="btnExplore" type="button" disabled>ĐANG TẢI MÔ HÌNH…</button>
+    </section>
+    <div class="intro-credit">Được phát triển bởi <strong>YooBook</strong></div>
+  </div>
+</div>
+
+<div class="app">
+  <header class="topbar">
+    <img class="logo" alt="YooBook" src="data:image/png;base64,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
+">
+    <div class="titles">
+      <div class="badge">Khoa học tự nhiên · Chủ đề 10</div>
+      <h1 class="lg">Thí nghiệm về hô hấp ở thực vật</h1><h1 class="sm">Hô hấp ở thực vật</h1>
+    </div>
+    <button class="tb-btn" id="btnFullscreen" aria-label="Toàn màn hình" title="Toàn màn hình" type="button"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </header>
+
+  <div class="main"><div class="frame" id="frame">
+    <div class="stage" id="stage" data-step="0">
+      <canvas id="scene" tabindex="0" aria-label="Bàn thí nghiệm 3D với 13 nhóm dụng cụ, hoá chất; kéo nền để xoay, kéo đồ vật để di chuyển, cuộn để thu phóng.">Trình duyệt cần hỗ trợ WebGL.</canvas>
+      <div class="vignette"></div>
+      <svg class="leaders" id="leaders" aria-hidden="true"></svg>
+      <div class="pins" id="pins"></div>
+      <div class="tags" id="tags"></div>
+      <div class="clock" id="clock" aria-live="polite"></div>
+      <div class="toast" id="toast" role="status"></div>
+      <div class="error" id="error" role="alert" hidden></div>
+      <div class="stage-tools" role="toolbar" aria-label="Điều khiển góc nhìn">
+        <button class="ghost" id="reset" type="button" aria-label="Toàn cảnh, đặt lại đồ vật" title="Toàn cảnh · đặt lại đồ vật"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        <button class="ghost" id="rotate" type="button" aria-pressed="false" aria-label="Tự xoay" title="Tự xoay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+        <button class="ghost" id="view" type="button" aria-pressed="false" aria-label="Xem từ dưới" title="Xem từ dưới"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <i class="tdiv" aria-hidden="true"></i>
+        <button class="ghost" id="btnPins" type="button" aria-pressed="false" aria-label="Ghi chú" title="Hiện / ẩn tên dụng cụ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></button>
+        <button class="ghost" id="btnVoice" type="button" aria-pressed="false" aria-label="Thuyết minh" title="Nghe thuyết minh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
+      </div>
+      <div class="cam-hint" aria-hidden="true">Kéo nền để xoay · Kéo đồ vật để di chuyển · Cuộn để phóng to</div>
+    </div>
+    <div class="dock"><div class="panel" id="panel" aria-live="polite"></div></div>
+    <div class="modal" id="p1Modal" hidden></div>
+    <div class="part-card" id="partCard" aria-live="polite"></div>
+    <div class="action-bar" id="actionBar" role="group" aria-label="Thao tác"></div>
+    <div class="sheet-wrap" id="sheet" aria-label="Phiếu thực hành"></div>
+    <div class="steps" id="steps" role="tablist" aria-label="Các bước học">
+      <button class="step" data-step="0" data-n="1" aria-pressed="true" type="button"><b>1</b><span>Chuẩn bị thí nghiệm</span></button>
+      <button class="step" data-step="1" data-n="2" aria-pressed="false" type="button"><b>2</b><span>Tiến hành thí nghiệm</span></button>
+      <button class="step" data-step="2" data-n="3" aria-pressed="false" type="button"><b>3</b><span>Phiếu thực hành</span></button>
+    </div>
+  </div></div>
+</div>
+
+
+<script>
+// =====================================================================
+// APP UI — intro, chấm số dụng cụ, các bước, thẻ nhiệm vụ, phiếu thực hành
+// =====================================================================
+(()=>{'use strict';
+const $=id=>document.getElementById(id);
+const frame=$('frame'),stage=$('stage'),panel=$('panel'),actionBar=$('actionBar'),partCard=$('partCard'),sheet=$('sheet'),stepsEl=$('steps');
+const svg=d=>`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON={
+  back:svg('<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>'),
+  next:svg('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'),
+  pin:svg('<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>'),
+  doc:svg('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/>'),
+  reset:svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>').replace(/14/g,'18'),
+  print:svg('<path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7"/><path d="M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/>').replace(/14/g,'18'),
+  eye:svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>').replace(/14/g,'18'),
+};
+
+/* ---------------- màn giới thiệu ---------------- */
+let ready=false;
+function setReady(ok){
+  ready=true; clearInterval(fakeTimer);
+  $('introBar').style.width='100%';
+  $('introStatus').innerHTML='<span class="ready-dot"></span>'+(ok?'Sẵn sàng':'Không khởi tạo được mô hình 3D — vẫn dùng được phiếu thực hành');
+  $('btnExplore').disabled=false;
+  $('btnExplore').textContent='BẮT ĐẦU KHÁM PHÁ';
+}
+let fake=8;
+const fakeTimer=setInterval(()=>{ fake=Math.min(92,fake+Math.random()*14); $('introBar').style.width=fake+'%'; },260);
+window.addEventListener('bench3d-ready',()=>setReady(true));
+setTimeout(()=>{ if(!ready&&window.bellModel) setReady(true); },900);
+setTimeout(()=>{ if(!ready) setReady(!!window.bellModel); },4000);
+$('btnExplore').onclick=()=>{ $('introLoader').classList.add('hide'); setTimeout(()=>$('introLoader').remove(),550); speak(); };
+
+/* ---------------- dụng cụ (khớp bảng Dụng cụ / Hoá chất) · p = điểm neo trên mô hình 3D ---------------- */
+const EQUIPMENT=[
+ {n:1,cat:'Dụng cụ',name:'Đèn',p:[-3.32,2.25,-.78],desc:'Đèn bàn dùng để chiếu sáng bình hạt trong thí nghiệm tìm hiểu <b>ảnh hưởng của ánh sáng</b> đến hô hấp (bật 100 W trong 2 giờ).'},
+ {n:2,cat:'Dụng cụ',name:'Màng bọc thực phẩm',p:[-2.15,.46,-.8],desc:'Dùng đậy nhanh, kín miệng bình sau khi thả que diêm đang cháy vào, để <b>tăng nồng độ CO₂</b> ban đầu trong thí nghiệm khảo sát ảnh hưởng của CO₂.'},
+ {n:3,cat:'Dụng cụ',name:'Bình tam giác có nút cao su',p:[.525,1.5,-.8],desc:'Chứa nước vôi trong hoặc hạt nảy mầm; nút cao su giúp <b>đậy kín khí</b>, tránh CO₂ thoát ra ngoài khi đo.'},
+ {n:4,cat:'Dụng cụ',name:'Cốc 250 ml',p:[2.1,1.1,-.8],desc:'Dùng để đong, pha hoặc chứa nước trong quá trình chuẩn bị thí nghiệm.'},
+ {n:5,cat:'Dụng cụ',name:'Cảm biến khí CO₂',p:[-3.55,.3,1.2],desc:'Đo trực tiếp <b>nồng độ khí CO₂ (ppm)</b> sinh ra trong bình chứa hạt nảy mầm, hiển thị kết quả theo thời gian thực.'},
+ {n:6,cat:'Dụng cụ',name:'Đĩa Pêtri',p:[-1.55,.2,1.35],desc:'Dùng để ủ hạt đậu xanh (khô và được làm ẩm) ở nhiệt độ phòng trong 2 – 3 ngày, theo dõi tỉ lệ nảy mầm.'},
+ {n:7,cat:'Dụng cụ',name:'Diêm',p:[-.45,.2,1.35],desc:'Que diêm đang cháy được thả vào bình để làm <b>tăng nồng độ CO₂</b> ban đầu, phục vụ khảo sát ảnh hưởng của nồng độ CO₂ đến hô hấp.'},
+ {n:8,cat:'Dụng cụ',name:'Giấy thấm / bông y tế',p:[.65,.02,1.35],desc:'Lót dưới đĩa Pêtri, <b>giữ ẩm</b> cho hạt đậu xanh trong quá trình ủ nảy mầm.'},
+ {n:9,cat:'Dụng cụ',name:'Túi đựng hạt',p:[1.8,.1,1.35],desc:'Túi vải treo hạt nảy mầm trong bình nước vôi trong, giữ hạt <b>không chạm mặt nước</b> nhưng vẫn kín khí.'},
+ {n:10,cat:'Hoá chất / Mẫu vật',name:'Nước vôi trong',p:[3.2,1.1,-.8],desc:'Dùng để nhận biết khí CO₂: nước vôi trong sẽ <b>hoá đục</b> khi gặp CO₂ do hạt nảy mầm hô hấp thải ra.'},
+ {n:11,cat:'Hoá chất / Mẫu vật',name:'Nước lọc',p:[4.35,1.45,-.8],desc:'Dùng làm ẩm hạt đậu xanh, hoặc ngâm hạt ở thí nghiệm khảo sát ảnh hưởng của <b>độ ẩm</b> đến hô hấp.'},
+ {n:12,cat:'Hoá chất / Mẫu vật',name:'Hạt đậu xanh nảy mầm',p:[3,.3,1.35],desc:'Mẫu vật chính của thí nghiệm — hạt đang <b>hô hấp mạnh</b>, thải khí CO₂ nhiều hơn hạt khô.'},
+ {n:13,cat:'Hoá chất / Mẫu vật',name:'500 g đậu xanh',p:[4.25,.2,1.35],desc:'Nguồn hạt khô ban đầu, dùng để ủ nảy mầm hoặc làm <b>đối chứng</b> (hạt khô) trong các thí nghiệm.'},
+];
+const eqOf=n=>EQUIPMENT.find(e=>e.n===n);
+
+/* ---------------- quy trình (TN1 & TN2, theo SGK) ---------------- */
+const TN1_PA1=[
+ {tag:'Bước 1',focus:3,text:'Chuẩn bị hai bình tam giác chứa 50 ml nước vôi trong, đánh số lần lượt là bình 1 và bình 2.'},
+ {tag:'Bước 2',focus:9,text:'Cho hạt nảy mầm vào túi vải rồi đặt vào bình 1 sao cho đáy túi không chạm mặt nước vôi trong, đậy chặt bằng nút cao su đảm bảo kín khí. Bình 2 tiến hành tương tự nhưng túi vải không cho hạt (đối chứng).'},
+ {tag:'Bước 3',focus:10,text:'Quan sát sự thay đổi của nước vôi trong ở hai bình sau 1 – 2 giờ.'},
+ {tag:'Bước 4',focus:0,sheet:1,text:'Hoàn thiện Phiếu số 1.'},
+];
+const TN1_PA2=[
+ {tag:'Bước 1',focus:6,text:'Lấy hai đĩa pêtri: đĩa 1 đựng hạt đậu xanh khô; đĩa 2 đựng hạt đậu xanh được làm ẩm (đặt giấy thấm/bông lên đĩa, rải hạt rồi thêm 20 – 25 ml nước).'},
+ {tag:'Bước 2',focus:6,text:'Để hạt ở nhiệt độ phòng trong 2 – 3 ngày, duy trì điều kiện độ ẩm như bước 1 ở hai đĩa.'},
+ {tag:'Bước 3',focus:12,text:'So sánh tỉ lệ nảy mầm của hai đĩa sau 2 – 3 ngày.'},
+ {tag:'Bước 4',focus:5,text:'Lấy các hạt nảy mầm cho vào bình tam giác 250 ml và dùng cảm biến CO₂ để đo nồng độ CO₂ có trong bình.'},
+ {tag:'Bước 5',focus:5,text:'Đo trong 5 phút và ghi lại kết quả sau mỗi phút của hạt nảy mầm.'},
+ {tag:'Bước 6',focus:0,sheet:2,text:'Hoàn thiện Phiếu số 2.'},
+];
+const TN2_A=[
+ {tag:'Bước 1',focus:3,text:'Chuẩn bị hai bình tam giác chứa cùng lượng hạt đỗ xanh nảy mầm, dán nhãn lần lượt là bình 1 và bình 2.'},
+ {tag:'Bước 2',focus:5,text:'Với bình 1: thực hiện đo nồng độ CO₂ tương tự phương án 2 của Thí nghiệm 1 và điền kết quả vào Phiếu số 3.'},
+ {tag:'Bước 3',focus:1,sheet:3,text:'Với bình 2: bật đèn 100 W chiếu sáng trong thời gian 2 giờ, sau đó thực hiện đo nồng độ CO₂ tương tự, ghi kết quả vào Phiếu số 3.'},
+];
+const TN2_B=[
+ {tag:'Bước 1',focus:3,text:'Chuẩn bị ba bình tam giác, mỗi bình chứa 50 g hạt đỗ xanh khô; dán nhãn lần lượt là bình 1, bình 2, bình 3.'},
+ {tag:'Bước 2',focus:11,text:'Đậy kín nắp bình 1 (giữ khô). Bình 2 ngâm nước ấm 40 °C trong 2 giờ, sau đó gạn hết nước rồi đậy nắp. Bình 3 ngâm nước ấm 40 °C ngập hạt (mực nước cao hơn hạt 4 cm), đậy kín nắp.'},
+ {tag:'Bước 3',focus:5,sheet:3,text:'Thực hiện đo nồng độ CO₂ tương tự phương án 2 của Thí nghiệm 1 cho cả ba bình, ghi kết quả vào Phiếu số 3.'},
+];
+const TN2_C=[
+ {tag:'Bước 1',focus:3,text:'Chuẩn bị hai bình tam giác chứa cùng lượng hạt đỗ xanh nảy mầm, dán nhãn lần lượt là bình 1 và bình 2.'},
+ {tag:'Bước 2',focus:5,text:'Với bình 1: thực hiện đo nồng độ CO₂ tương tự phương án 2 của Thí nghiệm 1, ghi kết quả vào Phiếu số 3.'},
+ {tag:'Bước 3',focus:7,sheet:3,text:'Với bình 2: đốt một que diêm đang cháy, thả que diêm vào bình rồi đậy nhanh bằng màng bọc thực phẩm. Thực hiện đo nồng độ CO₂ tương tự, ghi kết quả vào Phiếu số 3.'},
+];
+const EXPS=[
+ {grp:0,label:'Phương án 1',full:'Phương án 1 (nước vôi trong)',title:'Chứng minh hạt nảy mầm thải khí carbon dioxide',steps:TN1_PA1},
+ {grp:0,label:'Phương án 2',full:'Phương án 2 (cảm biến CO₂)',title:'Chứng minh hạt nảy mầm thải khí carbon dioxide',steps:TN1_PA2,note:'Lưu ý: lượng CO₂ chuẩn trong không khí là 0,04% (≈ 400 ppm) — dùng để đối chiếu khi đọc kết quả cảm biến.'},
+ {grp:1,label:'a. Ánh sáng',full:'Thí nghiệm 2a (ánh sáng)',title:'Ánh sáng ảnh hưởng đến hô hấp của hạt',steps:TN2_A},
+ {grp:1,label:'b. Độ ẩm',full:'Thí nghiệm 2b (độ ẩm)',title:'Độ ẩm ảnh hưởng đến hô hấp của hạt',steps:TN2_B},
+ {grp:1,label:'c. Nồng độ CO₂',full:'Thí nghiệm 2c (nồng độ CO₂)',title:'Nồng độ khí CO₂ ảnh hưởng đến hô hấp của hạt',steps:TN2_C},
+];
+
+/* ---------------- trạng thái ---------------- */
+let step=0,ex=0,si=0,pinOn=0,cam=null,voice=false;
+const seen=new Set();
+const model=()=>window.bellModel;
+
+/* ---------------- chiếu điểm 3D → toạ độ khung (cùng công thức camera của shader) ---------------- */
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{const l=Math.hypot(...a)||1;return [a[0]/l,a[1]/l,a[2]/l];};
+function project(P){
+  if(!cam) return null;
+  const {eye,target,w,h}=cam;
+  const f=norm(sub(target,eye)),r=norm(cross(f,[0,1,0])),u=cross(r,f),d=sub(P,eye),z=dot(d,f);
+  if(z<=.05) return null;
+  const sx=dot(d,r)/z*2.7,sy=dot(d,u)/z*2.7;
+  return {x:(sx*h+w)/2,y:h-(sy*h+h)/2,w,h};
+}
+
+/* ---------------- chấm số ghi chú ---------------- */
+const pinsEl=$('pins'),leaders=$('leaders');
+EQUIPMENT.forEach(it=>{
+  const b=document.createElement('button');
+  b.type='button'; b.className='pin'; b.dataset.n=it.n;
+  b.setAttribute('aria-label',`${it.n}. ${it.name}`);
+  b.innerHTML=`<b>${it.n}</b><span>${it.name}</span>`;
+  b.onclick=e=>{ e.stopPropagation(); openTip(it.n); };
+  pinsEl.append(b);
+});
+function currentFocus(){ return step===1?EXPS[ex].steps[si].focus:0; }
+function pinAllowed(n){ return step===0||(step===1&&ex!==0&&n===currentFocus()); }
+const LIFT=46;
+function anchorOf(n){ const p=eqOf(n).p,o=model()&&model().offsetOf?model().offsetOf(n):[0,0,0]; return [p[0]+o[0],p[1]+o[1],p[2]+o[2]]; }
+function layoutPins(){
+  let lines='';
+  pinsEl.querySelectorAll('.pin').forEach(el=>{
+    const n=+el.dataset.n,p=pinAllowed(n)&&project(anchorOf(n));
+    if(!p||p.x<-20||p.x>p.w+20||p.y<LIFT||p.y>p.h+20){ el.hidden=true; return; }
+    el.hidden=false;
+    const r=el.querySelector('b').offsetWidth/2||17;
+    el.style.transform=`translate(${p.x-r}px,${p.y-LIFT-r}px)`;
+    el.classList.toggle('seen',seen.has(n)); el.classList.toggle('on',n===pinOn);
+    lines+=`<line x1="${p.x}" y1="${p.y}" x2="${p.x}" y2="${p.y-LIFT+r}"/><circle cx="${p.x}" cy="${p.y}" r="3"/>`;
+  });
+  leaders.innerHTML=lines;
+  layoutTags();
+  placeTip();
+}
+const tagsEl=$('tags');
+function layoutTags(){
+  const list=step===1&&model()&&model().tags?model().tags():[];
+  while(tagsEl.children.length<list.length) tagsEl.append(Object.assign(document.createElement('span'),{className:'tag'}));
+  [...tagsEl.children].forEach((el,i)=>{
+    const t=list[i],p=t&&project(t.p);
+    if(!p){ el.hidden=true; return; }
+    el.hidden=false; el.textContent=t.text; el.classList.toggle('ok',!!t.ok);
+    el.style.transform=`translate(${p.x-el.offsetWidth/2}px,${p.y-el.offsetHeight}px)`;
+  });
+}
+function placeTip(){
+  if(!pinOn||!partCard.classList.contains('show')||innerWidth<=620) return;
+  const p=project(anchorOf(pinOn)); if(!p) return;
+  const cw=partCard.offsetWidth,ch=partCard.offsetHeight;
+  let x=p.x+28,y=p.y-LIFT-20;
+  if(x+cw>p.w-12) x=p.x-28-cw;
+  x=Math.max(12,Math.min(x,p.w-cw-12)); y=Math.max(76,Math.min(y,p.h-ch-12));
+  partCard.style.transform=`translate3d(${x}px,${y}px,0)`;
+}
+function openTip(n){
+  const it=eqOf(n); if(!it) return;
+  pinOn=n; seen.add(n);
+  partCard.innerHTML=`<button type="button" class="pc-x" id="pcClose" aria-label="Đóng">✕</button><div class="pc-body"><div class="pc-kick">${it.cat} ${it.n}</div><h3>${it.name}</h3><div class="pc-desc">${it.desc}</div></div>`;
+  partCard.classList.add('show');
+  $('pcClose').onclick=closeTip;
+  if(model()) model().setFocus(n);
+  if(step===0) renderStep0(); else layoutPins();
+  speak(`${it.name}. ${partCard.querySelector('.pc-desc').textContent}`);
+}
+function closeTip(){ pinOn=0; partCard.classList.remove('show'); layoutPins(); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&pinOn) closeTip(); });
+
+/* ---------------- thẻ nhiệm vụ + cụm nút ---------------- */
+function setPanel(html){ panel.innerHTML=html; panel.classList.toggle('show',!!html); }
+function setActions(list){
+  actionBar.innerHTML='';
+  list.forEach(a=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='btn'+(a.alt?' alt':''); b.innerHTML=a.label;
+    if(a.disabled) b.disabled=true; if(a.title) b.title=a.title;
+    b.onclick=a.onClick; actionBar.append(b);
+  });
+  actionBar.classList.toggle('show',list.length>0);
+  syncActionHeight();
+}
+function syncActionHeight(){ frame.style.setProperty('--ab-h',actionBar.classList.contains('show')&&innerWidth>620?(actionBar.offsetHeight+10)+'px':'0px'); }
+window.addEventListener('resize',syncActionHeight);
+
+/* Bước 1 · chuẩn bị */
+function renderStep0(){
+  const c=seen.size,N=EQUIPMENT.length;
+  setPanel(`<div class="panel-k">Nhiệm vụ</div>
+    <div class="panel-t">Em hãy quan sát các <span class="b">dụng cụ, hoá chất</span> trên bàn: bấm vào <span class="b">chấm số</span> để xem ghi chú (đủ ${N} món).</div>
+    <div class="panel-x"><div class="meter" aria-label="Đã xem ${c}/${N}">${EQUIPMENT.map(e=>`<i class="${seen.has(e.n)?'on':''}"></i>`).join('')}<b>${c}/${N}</b></div></div>`);
+  setActions(c>=N
+    ?[{label:`Sang bước 2: Tiến hành thí nghiệm ${ICON.next}`,onClick:()=>go(1)}]
+    :[{label:`Xem đủ ${N} dụng cụ để sang bước 2`,disabled:true,title:`Bấm vào các số trên bàn để xem đủ ${N} dụng cụ (đã xem ${c}/${N})`}]);
+  layoutPins();
+}
+
+/* Bước 2 · tiến hành */
+/* ---------- Thí nghiệm 1 · Phương án 1: học sinh thao tác trên bàn 3D ---------- */
+const PA1_TEXT={
+  check1:{b:1,ttl:'Kiểm tra bình 1',gd:'Hai bình tam giác đã có sẵn <span class="b">50 ml nước vôi trong</span>, đánh số bình 1 và bình 2. Bấm vào <span class="b">bình 1</span> để kiểm tra.',how:'click'},
+  check2:{b:1,ttl:'Kiểm tra bình 2',gd:'Bấm vào <span class="b">bình 2</span> để kiểm tra nước vôi trong.',how:'click'},
+  seed:{b:2,ttl:'Cho hạt nảy mầm vào túi vải',gd:'Kéo <span class="b">đĩa hạt đậu xanh nảy mầm</span> tới <span class="b">túi vải 1</span> rồi thả tay để đổ hạt vào túi.',how:'drag'},
+  open1:{b:2,ttl:'Mở nút cao su bình 1',gd:'Kéo <span class="b">nút cao su</span> của bình 1 nhấc ra, đặt xuống bàn.',how:'drag'},
+  bag1:{b:2,ttl:'Đặt túi hạt vào bình 1',gd:'Kéo <span class="b">túi vải có hạt</span> tới miệng <span class="b">bình 1</span> rồi thả tay. Túi được treo sao cho đáy túi <span class="b">không chạm</span> mặt nước vôi trong.',how:'drag'},
+  close1:{b:2,ttl:'Đậy kín bình 1',gd:'Kéo <span class="b">nút cao su</span> trên bàn đặt lại vào miệng bình 1, đảm bảo <span class="b">kín khí</span>.',how:'drag'},
+  open2:{b:2,ttl:'Bình 2 (đối chứng) · mở nút',gd:'Bình 2 làm tương tự nhưng túi vải <span class="b">không có hạt</span>. Kéo <span class="b">nút cao su</span> của bình 2 nhấc ra, đặt xuống bàn.',how:'drag'},
+  bag2:{b:2,ttl:'Bình 2 · đặt túi rỗng',gd:'Kéo <span class="b">túi vải rỗng</span> tới miệng <span class="b">bình 2</span> rồi thả tay.',how:'drag'},
+  close2:{b:2,ttl:'Bình 2 · đậy kín',gd:'Kéo <span class="b">nút cao su</span> trên bàn đặt lại vào miệng bình 2.',how:'drag'},
+  wait:{b:3,ttl:'Quan sát sau 1 – 2 giờ',gd:'Bấm <span class="b">Tua nhanh</span> để thời gian trôi nhanh, quan sát sự thay đổi của nước vôi trong ở hai bình.',how:'clock'},
+  sheet:{b:4,ttl:'Hoàn thiện Phiếu số 1',gd:'Ghi hiện tượng, giải thích và kết luận vào phiếu rồi bấm <span class="b">Nộp phiếu</span>.',how:'sheet'},
+};
+const HOW={click:svg('<path d="M9 9V4.5a1.5 1.5 0 0 1 3 0V12l3.5-1a2 2 0 0 1 2.4 1.6l.6 4.4a4 4 0 0 1-4 4.5h-2.7a4 4 0 0 1-3.2-1.6L5 15.5"/>')+'Bấm vào vật có vòng sáng',drag:ICON.pin+'Nhấn giữ, kéo tới vòng sáng thứ hai',clock:'⏱ Thời gian trên bàn chạy nhanh',sheet:ICON.doc+'Phiếu số 1'};
+function fmtHours(h){ const H=Math.floor(h+1e-6),M=Math.round((h-H)*60)%60; return `${H} giờ ${String(M).padStart(2,'0')} phút`; }
+function updateClock(){
+  const c=$('clock'),st=model()&&model().pa1&&model().pa1.state();
+  const on=step===1&&ex===0&&st&&st.active&&(st.action==='wait'||st.action==='sheet'||st.hours>0);
+  c.classList.toggle('show',!!on); if(!on) return;
+  c.innerHTML=`⏱ ${fmtHours(st.hours)}<span class="bar"><i style="width:${st.hours/2*100}%"></i></span><small>/ 2 giờ</small>`;
+  if(st.action==='wait') renderPA1Actions(st);
+}
+let toastT=0;
+function toast(text,warn){ const t=$('toast'); t.textContent=text; t.classList.toggle('warn',!!warn); t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600); }
+function renderPA1Actions(st){
+  if(st.action==='wait'){
+    const acts=[];
+    if(st.hours<2) acts.push({alt:st.hours>=1,label:st.playing?'⏸ Tạm dừng':st.hours>0?'▶ Tua tiếp':'▶ Tua nhanh',onClick:()=>{ model().pa1.play(!model().pa1.state().playing); }});
+    if(st.hours>=1) acts.push({label:`Ghi kết quả vào phiếu ${ICON.next}`,onClick:()=>{ model().pa1.play(false); model().pa1.next(); }});
+    const sig=acts.map(a=>a.label).join('|'); if(actionBar.dataset.sig===sig) return; actionBar.dataset.sig=sig;
+    setActions(acts);
+  }else if(st.action==='sheet'){ actionBar.dataset.sig=''; setActions([{label:`${ICON.doc} Mở phiếu số 1`,onClick:openP1}]); }
+  else{ actionBar.dataset.sig=''; setActions([]); }
+}
+function renderPA1(){
+  const m=model();
+  const grpBtns=['Thí nghiệm 1','Thí nghiệm 2'].map((t,g)=>`<button type="button" data-g="${g}" aria-pressed="${g===0}">${t}</button>`).join('');
+  const subBtns=EXPS.map((x,i)=>x.grp===0?`<button type="button" data-x="${i}" aria-pressed="${i===0}">${x.label}</button>`:'').join('');
+  const head=`<div class="xseg" role="group" aria-label="Chọn thí nghiệm">${grpBtns}</div><div class="xseg sub" role="group" aria-label="Chọn phương án">${subBtns}</div>`;
+  if(!m||!m.pa1||!m.pa1.enter()){ setPanel(head+`<div class="panel-t"><div class="gd">Đang tải dụng cụ thí nghiệm…</div></div>`); setActions([]); bindExpTabs(); return; }
+  const st=m.pa1.state(),T=PA1_TEXT[st.action],order=m.pa1.order;
+  setPanel(head+`
+    <div class="panel-k"><div class="trow"><span class="tk">BƯỚC ${T.b} · THAO TÁC ${st.i+1}/${order.length}</span><div class="seg" aria-hidden="true">${order.map((_,i)=>`<i class="${i<st.i?'on':i===st.i?'now':''}"></i>`).join('')}</div><button type="button" class="back" id="pRestart" aria-label="Làm lại phương án 1" title="Làm lại phương án 1">${ICON.reset.replace(/18/g,'14')}</button></div></div>
+    <div class="panel-t"><div class="ttl">${T.ttl}</div><div class="gd">${T.gd}</div></div>
+    <div class="panel-x"><div class="hrow"><span class="hint">${HOW[T.how]}</span>${T.how==='click'||T.how==='drag'?`<button type="button" class="quick-act" id="pQuick" title="Làm nhanh thao tác này">⚡ Làm nhanh</button>`:''}</div></div>`);
+  bindExpTabs();
+  $('pRestart').onclick=()=>{ if(confirm('Làm lại phương án 1 từ đầu?')){ m.pa1.restart(); renderPA1(); } };
+  if($('pQuick')) $('pQuick').onclick=()=>m.pa1.quick();
+  actionBar.dataset.sig=''; renderPA1Actions(st); updateClock();
+  if(st.action==='sheet'&&!$('p1Modal').dataset.auto){ $('p1Modal').dataset.auto='1'; openP1(); }
+  closeTipSilently(); speak();
+}
+function bindExpTabs(){
+  panel.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ const g=+b.dataset.g; if(EXPS[ex].grp!==g){ ex=EXPS.findIndex(x=>x.grp===g); si=0; renderStep1(); } });
+  panel.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ ex=+b.dataset.x; si=0; renderStep1(); });
+}
+function onPA1Change(msg){
+  if(msg&&msg.clock){ updateClock(); return; }
+  if(msg&&msg.ok) toast('✓ '+msg.ok);
+  if(msg&&msg.warn) toast(msg.warn,true);
+  if(step===1&&ex===0) renderPA1();
+}
+/* Phiếu số 1 bật lên trên bàn thí nghiệm; nộp xong chuyển sang phương án 2. Dữ liệu dùng chung với Mục 3. */
+const P1_KEYS=['p1-b1-ht','p1-b1-gt','p1-b2-ht','p1-b2-gt','p1-kl'];
+function openP1(){
+  const md=$('p1Modal');
+  md.innerHTML=`<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="p1T">
+    <span class="sec-k">Phiếu số 1</span>
+    <h2 id="p1T">Chứng minh hô hấp ở hạt nảy mầm thải khí carbon dioxide</h2>
+    <p class="lead">Sau 2 giờ, em quan sát nước vôi trong ở hai bình và hoàn thành bảng.</p>
+    <table class="sheet-table stack"><thead><tr><th scope="col">Bình</th><th scope="col">Hiện tượng</th><th scope="col">Giải thích</th></tr></thead><tbody>
+      <tr><th scope="row">Bình 1<small>Có hạt nảy mầm</small></th><td data-l="Hiện tượng">${ta('p1-b1-ht','Nước vôi…','short','Bình 1 — Hiện tượng')}</td><td data-l="Giải thích">${ta('p1-b1-gt','Vì sao?','short','Bình 1 — Giải thích')}</td></tr>
+      <tr><th scope="row">Bình 2<small>Túi rỗng (đối chứng)</small></th><td data-l="Hiện tượng">${ta('p1-b2-ht','Nước vôi…','short','Bình 2 — Hiện tượng')}</td><td data-l="Giải thích">${ta('p1-b2-gt','Vì sao?','short','Bình 2 — Giải thích')}</td></tr>
+    </tbody></table>
+    <label class="fld">Kết luận${ta('p1-kl','Hạt nảy mầm có hô hấp và thải ra khí…','short')}</label>
+    <p class="modal-msg" id="p1Msg" role="alert"></p>
+    <div class="modal-act"><button type="button" class="btn alt" id="p1Back">Quan sát lại</button><button type="button" class="btn" id="p1Submit">Nộp phiếu ${ICON.next}</button></div>
+  </div>`;
+  md.hidden=false; wireFields(md);
+  md.querySelector('textarea').focus();
+  $('p1Back').onclick=()=>{ md.hidden=true; };
+  $('p1Submit').onclick=()=>{
+    const miss=P1_KEYS.filter(k=>!String(getVal(k,'')).trim());
+    md.querySelectorAll('textarea').forEach(t=>t.classList.toggle('miss',miss.includes(t.dataset.key)));
+    if(miss.length){ $('p1Msg').textContent='Em hãy điền đủ hiện tượng, giải thích của hai bình và kết luận trước khi nộp.'; md.querySelector('textarea.miss').focus(); return; }
+    setVal('p1-submitted',new Date().toLocaleString('vi-VN'));
+    md.hidden=true; delete md.dataset.auto;
+    toast('✓ Đã nộp phiếu số 1 · chuyển sang phương án 2');
+    ex=1; si=0; renderStep1();
+  };
+}
+
+function renderStep1(){
+  $('p1Modal').hidden=true;
+  if(ex===0){ renderPA1(); return; }
+  if(model()&&model().pa1) model().pa1.exit();
+  updateClock();
+  const E=EXPS[ex],n=E.steps.length,s=E.steps[si],it=eqOf(s.focus);
+  const grpBtns=['Thí nghiệm 1','Thí nghiệm 2'].map((t,g)=>`<button type="button" data-g="${g}" aria-pressed="${E.grp===g}">${t}</button>`).join('');
+  const subBtns=EXPS.map((x,i)=>x.grp===E.grp?`<button type="button" data-x="${i}" aria-pressed="${i===ex}">${x.label}</button>`:'').join('');
+  setPanel(`<div class="xseg" role="group" aria-label="Chọn thí nghiệm">${grpBtns}</div>
+    <div class="xseg sub" role="group" aria-label="Chọn phương án">${subBtns}</div>
+    <div class="panel-k"><div class="trow"><span class="tk">THAO TÁC ${si+1}/${n}</span><div class="seg" aria-hidden="true">${E.steps.map((_,i)=>`<i class="${i<si?'on':i===si?'now':''}"></i>`).join('')}</div><button type="button" class="back" id="pBack" aria-label="Thao tác trước" title="Thao tác trước" ${si?'':'disabled'}>${ICON.back}</button></div></div>
+    <div class="panel-t"><div class="ttl">${E.title}</div><div class="gd"><span class="b">${s.tag}.</span> ${s.text}</div></div>
+    <div class="panel-x">${E.note?`<p class="note">${E.note}</p>`:''}${it?`<span class="hint">${ICON.pin}Đang xem cận cảnh: ${it.name}</span>`:''}</div>`);
+  panel.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{ const g=+b.dataset.g; if(EXPS[ex].grp!==g){ ex=EXPS.findIndex(x=>x.grp===g); si=0; renderStep1(); } });
+  panel.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ ex=+b.dataset.x; si=0; renderStep1(); });
+  $('pBack').onclick=()=>{ if(si){ si--; renderStep1(); } };
+  const acts=[];
+  if(s.sheet) acts.push({alt:true,label:`${ICON.doc} Điền phiếu số ${s.sheet}`,onClick:()=>go(2,'sec'+s.sheet)});
+  if(si<n-1) acts.push({label:`Thao tác tiếp ${ICON.next}`,onClick:()=>{ si++; renderStep1(); }});
+  else if(ex<EXPS.length-1) acts.push({label:`Sang ${EXPS[ex+1].full} ${ICON.next}`,onClick:()=>{ ex++; si=0; renderStep1(); }});
+  else acts.push({label:`Sang phiếu thực hành ${ICON.next}`,onClick:()=>go(2)});
+  setActions(acts);
+  closeTipSilently();
+  if(model()) model().setFocus(s.focus); else layoutPins();
+  speak();
+}
+function closeTipSilently(){ pinOn=0; partCard.classList.remove('show'); }
+
+/* ---------------- phiếu thực hành (lưu tự động trên trình duyệt) ---------------- */
+const STORE_KEY='hohap-worksheet-v2';
+let store; try{ store=JSON.parse(localStorage.getItem(STORE_KEY)||'{}'); }catch(e){ store={}; }
+function saveStore(){ try{ localStorage.setItem(STORE_KEY,JSON.stringify(store)); }catch(e){} }
+function setVal(k,v){ store[k]=v; saveStore(); const m=$('shMsg'); if(m){ m.textContent='Đã lưu tự động · '+new Date().toLocaleTimeString('vi-VN'); m.dataset.s='1'; } }
+const getVal=(k,d='')=>store[k]!==undefined?store[k]:d;
+let p2rows=getVal('p2-rows',null)||[1,2,3,4,5];
+const TREND=[{v:-2,t:'▼▼ Giảm mạnh'},{v:-1,t:'▼ Giảm nhẹ'},{v:0,t:'— Không đổi'},{v:1,t:'▲ Tăng nhẹ'},{v:2,t:'▲▲ Tăng mạnh'}];
+const ta=(key,ph,cls='',label='')=>`<textarea class="${cls}" data-key="${key}" placeholder="${ph}"${label?` aria-label="${label}"`:''}></textarea>`;
+const trend=(key,label)=>`<div class="trend" role="radiogroup" aria-label="${label}" data-key="${key}">${TREND.map(o=>`<button type="button" role="radio" data-v="${o.v}" aria-pressed="false">${o.t}</button>`).join('')}</div>`;
+function trendTable(id,rows){
+  return `<table class="sheet-table stack"><thead><tr><th scope="col">Điều kiện khảo sát</th><th scope="col">Nồng độ CO₂ (tăng hay giảm)</th></tr></thead><tbody>
+    ${rows.map((r,i)=>`<tr><th scope="row">${r[0]}<small>${r[1]}</small></th><td>${trend(`p3${id}-b${i+1}`,`${r[0]} — nồng độ CO₂`)}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+function p2TableHTML(){
+  return `<table class="sheet-table"><thead><tr><th scope="col">Phút thứ</th><th scope="col">Nồng độ khí CO₂ (ppm)</th></tr></thead><tbody>
+    ${p2rows.map(m=>`<tr><th scope="row">${m}</th><td><input type="number" inputmode="numeric" placeholder="VD: 6400" data-key="p2-min-${m}" aria-label="Nồng độ CO₂ phút thứ ${m}"></td></tr>`).join('')}
+  </tbody></table>`;
+}
+function snapshot(){
+  try{ if(model()){ model().setFocus(0); model().render(); } return $('scene').toDataURL('image/jpeg',.85); }catch(e){ return ''; }
+}
+function renderSheet(target){
+  const shot=snapshot();
+  sheet.innerHTML=`<div class="sheet-layout">
+  <aside class="sheet-aside" aria-label="Bàn thí nghiệm">
+    <div class="sheet-res"><span class="k">BÀN THÍ NGHIỆM CỦA EM</span>${shot?`<img src="${shot}" alt="Ảnh bàn thí nghiệm 3D" draggable="false">`:''}<button type="button" class="btn alt" id="shBack">${ICON.eye}Xem lại bàn thí nghiệm</button></div>
+    <div class="sheet-res toc"><span class="k">MỤC LỤC PHIẾU</span><nav class="sheet-toc"><a href="#sec1" data-t="sec1"><b>1</b>Hạt nảy mầm thải CO₂</a><a href="#sec2" data-t="sec2"><b>2</b>Hô hấp của hạt nảy mầm</a><a href="#sec3" data-t="sec3"><b>3</b>Các yếu tố ảnh hưởng</a></nav></div>
+  </aside>
+  <section class="sheet-main" aria-label="Phiếu thực hành">
+  <div class="sheet-paper" id="printArea">
+    <div class="sheet-head"><div class="sheet-kick">Thí nghiệm về hô hấp ở thực vật</div><h2>Phiếu thực hành</h2></div>
+    <div class="sheet-info"><label>Họ và tên<input type="text" data-key="hoten" placeholder="Em ghi họ tên…" autocomplete="off"></label><label class="cls">Lớp / Nhóm<input type="text" data-key="lop" placeholder="Lớp, nhóm" autocomplete="off"></label></div>
+
+    <div class="sheet-sec" id="sec1">
+      <span class="sec-k">Phiếu số 1</span>
+      <h3>Chứng minh hô hấp ở hạt nảy mầm thải khí carbon dioxide</h3>
+      ${getVal('p1-submitted')?`<p class="sec-ok">✓ Đã nộp lúc ${getVal('p1-submitted')} (từ thí nghiệm 1 · phương án 1)</p>`:''}
+      <table class="sheet-table stack"><thead><tr><th scope="col">Bình</th><th scope="col">Hiện tượng</th><th scope="col">Giải thích</th></tr></thead><tbody>
+        <tr><th scope="row">Bình 1<small>Có hạt nảy mầm</small></th><td data-l="Hiện tượng">${ta('p1-b1-ht','Nước vôi…','short','Bình 1 — Hiện tượng')}</td><td data-l="Giải thích">${ta('p1-b1-gt','Vì sao?','short','Bình 1 — Giải thích')}</td></tr>
+        <tr><th scope="row">Bình 2<small>Đối chứng, không có hạt</small></th><td data-l="Hiện tượng">${ta('p1-b2-ht','Nước vôi…','short','Bình 2 — Hiện tượng')}</td><td data-l="Giải thích">${ta('p1-b2-gt','Vì sao?','short','Bình 2 — Giải thích')}</td></tr>
+      </tbody></table>
+      <label class="fld">Kết luận${ta('p1-kl','Hạt nảy mầm có hô hấp và thải ra khí…')}</label>
+    </div>
+
+    <div class="sheet-sec" id="sec2">
+      <span class="sec-k">Phiếu số 2</span>
+      <h3>Hô hấp của hạt nảy mầm</h3>
+      <div id="p2wrap">${p2TableHTML()}</div>
+      <button type="button" class="addrow" id="p2add">+ Thêm phút đo</button>
+      <div class="chartbox"><canvas id="p2chart" aria-label="Đồ thị nồng độ CO₂ theo thời gian"></canvas></div>
+      <label class="fld">Nhận xét về sự thay đổi của nồng độ khí CO₂ theo thời gian${ta('p2-nx','Nồng độ CO₂ có xu hướng…')}</label>
+      <label class="fld">Kết luận${ta('p2-kl','Hạt nảy mầm hô hấp liên tục, nồng độ CO₂…')}</label>
+    </div>
+
+    <div class="sheet-sec" id="sec3">
+      <span class="sec-k">Phiếu số 3</span>
+      <h3>Ánh sáng, độ ẩm, nồng độ khí CO₂ ảnh hưởng đến hô hấp của hạt</h3>
+      <h4>a. Ánh sáng</h4>
+      ${trendTable('a',[['Bình 1','Không chiếu đèn'],['Bình 2','Chiếu đèn 100 W trong 2 giờ']])}
+      <label class="fld">Kết luận${ta('p3a-kl','Ánh sáng ảnh hưởng… đến hô hấp của hạt','short')}</label>
+      <h4>b. Độ ẩm</h4>
+      ${trendTable('b',[['Bình 1','Hạt khô'],['Bình 2','Ngâm 2 giờ rồi gạn nước'],['Bình 3','Ngâm ngập nước']])}
+      <label class="fld">Kết luận${ta('p3b-kl','Độ ẩm ảnh hưởng… đến hô hấp của hạt','short')}</label>
+      <h4>c. Nồng độ CO₂</h4>
+      ${trendTable('c',[['Bình 1','Bình thường'],['Bình 2','Thả que diêm đang cháy']])}
+      <label class="fld">Kết luận${ta('p3c-kl','Nồng độ CO₂ ban đầu ảnh hưởng… đến hô hấp của hạt','short')}</label>
+    </div>
+    <p class="sheet-foot">Ngày làm phiếu: ${new Date().toLocaleDateString('vi-VN')}</p>
+  </div>
+  <div class="sheet-actions"><button class="btn alt" id="shReset" type="button" aria-label="Làm lại phiếu">${ICON.reset}<span class="t">Làm lại phiếu</span></button><div class="grp"><span id="shMsg" class="sheet-msg" aria-live="polite">Dữ liệu được lưu tự động trên trình duyệt này</span><button class="btn" id="shPrint" type="button">${ICON.print}In / Lưu PDF</button></div></div>
+  </section></div>`;
+
+  wireFields(sheet);
+  sheet.querySelectorAll('.trend').forEach(g=>{
+    const key=g.dataset.key,mark=()=>g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(getVal(key,''))===b.dataset.v)));
+    mark();
+    g.querySelectorAll('button').forEach(b=>b.onclick=()=>{ setVal(key,b.dataset.v); mark(); });
+  });
+  $('p2add').onclick=()=>{
+    p2rows=[...p2rows,(p2rows[p2rows.length-1]||0)+1]; setVal('p2-rows',p2rows);
+    $('p2wrap').innerHTML=p2TableHTML(); wireFields($('p2wrap')); drawChart();
+    $('p2wrap').querySelector('tbody tr:last-child input').focus();
+  };
+  $('shBack').onclick=()=>go(1);
+  sheet.querySelectorAll('[data-t]').forEach(a=>a.onclick=e=>{ e.preventDefault(); $(a.dataset.t).scrollIntoView({behavior:'smooth',block:'start'}); });
+  $('shPrint').onclick=()=>window.print();
+  $('shReset').onclick=()=>{
+    if(!confirm('Xoá toàn bộ nội dung đã điền trong phiếu thực hành?')) return;
+    store={}; saveStore(); p2rows=[1,2,3,4,5]; renderSheet();
+  };
+  drawChart();
+  sheet.scrollTop=0;
+  if(target) requestAnimationFrame(()=>$(target).scrollIntoView({block:'start'}));
+}
+function wireFields(root){
+  root.querySelectorAll('[data-key]:is(input,textarea)').forEach(el=>{
+    const k=el.dataset.key; el.value=getVal(k,'');
+    el.addEventListener('input',()=>{ setVal(k,el.value); if(k.startsWith('p2-min-')) drawChart(); });
+  });
+}
+function drawChart(){
+  const cv=$('p2chart'); if(!cv) return;
+  const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth||600,H=cv.clientHeight||180;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const L=52,R=14,T=14,B=28;
+  const vals=p2rows.map(m=>{ const v=getVal('p2-min-'+m,''); return v===''?null:Number(v); }),nums=vals.filter(v=>v!==null);
+  ctx.font='11px Roboto,Arial'; ctx.fillStyle='#4A6461'; ctx.strokeStyle='#DCE6E4'; ctx.lineWidth=1;
+  const min=nums.length?Math.min(...nums):0,max=nums.length?Math.max(...nums):1,pad=(max-min)*.15||50,lo=min-pad,hi=max+pad;
+  const x=i=>L+(i/(p2rows.length-1||1))*(W-L-R),y=v=>T+(1-(v-lo)/(hi-lo||1))*(H-T-B);
+  for(let i=0;i<=4;i++){ const yy=T+i*(H-T-B)/4; ctx.beginPath(); ctx.moveTo(L,yy); ctx.lineTo(W-R,yy); ctx.stroke(); if(nums.length){ ctx.textAlign='right'; ctx.fillText(Math.round(hi-(hi-lo)*i/4),L-6,yy+4); } }
+  ctx.textAlign='center'; p2rows.forEach((m,i)=>ctx.fillText(m,x(i),H-10));
+  if(!nums.length){ ctx.fillText('Nhập số liệu ở bảng trên để xem đồ thị nồng độ CO₂ (ppm) theo phút',W/2,H/2); return; }
+  ctx.strokeStyle='#0E5A55'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.beginPath();
+  let started=false; vals.forEach((v,i)=>{ if(v===null) return; started?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); started=true; }); ctx.stroke();
+  vals.forEach((v,i)=>{ if(v===null) return; ctx.beginPath(); ctx.arc(x(i),y(v),4.5,0,7); ctx.fillStyle='#C8F04A'; ctx.fill(); ctx.strokeStyle='#0E5A55'; ctx.lineWidth=2; ctx.stroke(); });
+}
+window.addEventListener('resize',()=>{ if(step===2) drawChart(); });
+
+/* ---------------- chuyển bước ---------------- */
+const stepBtns=[...stepsEl.querySelectorAll('.step')];
+function go(n,target){
+  step=n; stage.dataset.step=String(n);
+  stepBtns.forEach((b,i)=>{ b.setAttribute('aria-pressed',String(i===n)); if(i===n) b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); if(i<n) b.classList.add('done'); });
+  stepsEl.classList.remove('open');
+  closeTipSilently();
+  if(n!==1){ $('p1Modal').hidden=true; if(model()&&model().pa1) model().pa1.exit(); updateClock(); }
+  if(n===2){ setPanel(''); setActions([]); renderSheet(target); sheet.classList.add('show'); speak('Phiếu thực hành. Em hoàn thành các phiếu số 1, 2 và 3.'); }
+  else{ sheet.classList.remove('show'); n===0?(model()&&model().setFocus(0),renderStep0(),speak()):renderStep1(); }
+}
+stepBtns.forEach(b=>b.onclick=()=>{
+  const n=+b.dataset.step;
+  if(innerWidth<=620&&n===step){ stepsEl.classList.toggle('open'); return; }
+  go(n);
+});
+document.addEventListener('click',e=>{ if(!stepsEl.contains(e.target)) stepsEl.classList.remove('open'); });
+
+/* ---------------- cụm icon ---------------- */
+$('btnPins').onclick=e=>{ const on=pinsEl.classList.toggle('names'); e.currentTarget.setAttribute('aria-pressed',String(on)); layoutPins(); };
+$('btnVoice').onclick=e=>{ voice=!voice; e.currentTarget.setAttribute('aria-pressed',String(voice)); if(voice) speak(); else if(window.speechSynthesis) speechSynthesis.cancel(); };
+$('btnFullscreen').onclick=()=>{ const d=document; if(d.fullscreenElement) d.exitFullscreen(); else if(d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(()=>{}); };
+function speak(text){
+  if(!voice||!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const t=text||[...panel.querySelectorAll('.panel-t,.panel-x .note')].map(e=>e.textContent).join('. ');
+  if(!t) return;
+  const u=new SpeechSynthesisUtterance(t); u.lang='vi-VN';
+  const v=speechSynthesis.getVoices().find(v=>/^vi/i.test(v.lang)); if(v) u.voice=v;
+  speechSynthesis.speak(u);
+}
+
+/* ---------------- nối với mô hình 3D ---------------- */
+function attachModel(){
+  if(!model()||attachModel.done) return; attachModel.done=true;
+  model().onDraw=c=>{ cam=c; layoutPins(); };
+  model().onFocusChange=f=>{ if(f===0&&pinOn) closeTip(); };
+  if(model().pa1) model().pa1.onChange=onPA1Change;
+  model().render();
+}
+window.addEventListener('bench3d-ready',()=>{ if(step===1&&ex===0) renderPA1(); });
+attachModel(); window.addEventListener('bench3d-model',attachModel); window.addEventListener('bench3d-ready',attachModel);
+window.addEventListener('resize',layoutPins);
+renderStep0();
+})();
+</script>
+<script type="module">
+// =====================================================================
+// 3D LAB BENCH — three.js (thay bộ raytracer cũ): mô hình lưới, khử răng cưa MSAA, kéo / cầm được từng đồ vật.
+// Toạ độ giữ nguyên như bản cũ (đơn vị bàn). Dụng cụ có GLB thì nạp GLB, chưa có thì dựng tạm bằng hình khối.
+// API cho phần giao diện: window.bellModel {render, setFocus, getState, offsetOf, onDraw, onFocusChange}
+// =====================================================================
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+/* GLB theo số dụng cụ (gốc toạ độ ở đáy vật, đơn vị bàn). Số 5 gồm 3 phần dùng chung toạ độ của cả bộ máy đo. */
+const GLB={
+  1:'https://3d-cdn.yoolife.com.vn/Ktl-V31UzdPibF4mpH/Ktl-V31UzdPibF4mpH.glb',    // đèn bàn
+  2:'https://3d-cdn.yoolife.com.vn/LYj5_SdIGgImb25BQI/LYj5_SdIGgImb25BQI.glb',    // màng bọc thực phẩm
+  3:'https://3d-cdn.yoolife.com.vn/pfc7MCf8ufVTToHg_U/pfc7MCf8ufVTToHg_U.glb',    // bình tam giác có nút cao su
+  4:'https://3d-cdn.yoolife.com.vn/UAcAURMbcGth0_b1Jy/UAcAURMbcGth0_b1Jy.glb',    // cốc 250 ml
+  5:['https://3d-cdn.yoolife.com.vn/eH995bfxR7MEu6Azsg/eH995bfxR7MEu6Azsg.glb',   // máy đo CO₂ · màn hình
+     'https://3d-cdn.yoolife.com.vn/gqvZ8zw-LN12qjVtlj/gqvZ8zw-LN12qjVtlj.glb',   //               · đầu dò
+     'https://3d-cdn.yoolife.com.vn/37xabH2Ypuq5wQIqqh/37xabH2Ypuq5wQIqqh.glb'],  //               · dây kết nối
+  6:'https://3d-cdn.yoolife.com.vn/UobyK8J4is8jTDKvHC/UobyK8J4is8jTDKvHC.glb',    // đĩa Pêtri (dùng cả cho đĩa hạt số 12, 13)
+  7:'https://3d-cdn.yoolife.com.vn/VUoOgFOb-F_JUD6Gmd/VUoOgFOb-F_JUD6Gmd.glb',    // diêm
+  8:'https://3d-cdn.yoolife.com.vn/c0CWNZXqMvcid_gR-J/c0CWNZXqMvcid_gR-J.glb',    // giấy thấm
+  9:'https://3d-cdn.yoolife.com.vn/axsw0GIYkTEpUHLpLT/axsw0GIYkTEpUHLpLT.glb',    // túi đựng hạt
+  10:'https://3d-cdn.yoolife.com.vn/dJvLkKgN1mbc4eAURY/dJvLkKgN1mbc4eAURY.glb',   // cốc nước vôi trong
+  11:'https://3d-cdn.yoolife.com.vn/iDL_cAmke9t7h2RV0g/iDL_cAmke9t7h2RV0g.glb',   // bình nước lọc
+};
+
+const canvas=document.getElementById('scene'),errorEl=document.getElementById('error');
+const fail=m=>{errorEl.hidden=false;errorEl.textContent=m;};
+let renderer;
+try{ renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true}); }
+catch(e){ fail('Trình duyệt này chưa bật WebGL. Hãy mở file bằng Chrome, Edge hoặc Safari có hỗ trợ tăng tốc đồ họa.'); throw e; }
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+const lin=(r,g,b)=>new THREE.Color().setRGB(r,g,b);          // màu tuyến tính, cùng giá trị với shader cũ
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#195658');
+// Môi trường phản chiếu giống bản cũ: phòng tối màu xanh lam + các tấm đèn dải — giúp kính có viền sáng, nhìn rõ
+{ const env=new THREE.Scene(); env.background=new THREE.Color('#163f3e');
+  const room=new THREE.Mesh(new THREE.BoxGeometry(30,16,30),new THREE.MeshBasicMaterial({color:lin(.05,.16,.16),side:THREE.BackSide})); room.position.y=5; env.add(room);
+  const floorM=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshBasicMaterial({color:lin(.12,.09,.06)})); floorM.rotation.x=-Math.PI/2; floorM.position.y=-2.5; env.add(floorM);
+  const panel=(w,h,pos,k)=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(k,k,k),side:THREE.DoubleSide})); m.position.set(...pos); m.lookAt(0,1.8,0); env.add(m); };
+  panel(.8,4.2,[-3.8,2.6,2.5],5.5); panel(.5,3.8,[3.6,2.5,1.3],4.8); panel(3,1.3,[-.5,5,-.5],3.6); panel(1.1,3.2,[1.2,2.8,-4],2.8);
+  // Camera nhìn chếch từ trên xuống nên phản chiếu trên thân bình dội về phía trước, xuống thấp:
+  // đặt các dải sáng hẹp ở đó để đồ thuỷ tinh có vệt sáng dọc như kính thật
+  const strip=(w,l,pos,k)=>{ const m=new THREE.Mesh(new THREE.PlaneGeometry(w,l),new THREE.MeshBasicMaterial({color:new THREE.Color(k,k,k),side:THREE.DoubleSide})); m.rotation.x=-Math.PI/2; m.position.set(...pos); env.add(m); };
+  strip(.7,9,[-2.6,-2.4,7],6); strip(.45,9,[3.4,-2.4,7],5);
+  panel(.9,5,[-5.5,3,8.5],5); panel(.6,4.5,[6,3,8],4);
+  scene.environment=new THREE.PMREMGenerator(renderer).fromScene(env,.02).texture; }
+scene.add(new THREE.HemisphereLight(0xdff3ee,0x3a2f25,.9));
+const sun=new THREE.DirectionalLight(0xffffff,2.2);
+sun.position.set(-4.5,7.5,6);
+sun.castShadow=true;
+Object.assign(sun.shadow.camera,{left:-6.5,right:6.5,top:5,bottom:-5,near:1,far:25});
+sun.shadow.mapSize.set(2048,2048);sun.shadow.bias=-.0004;sun.shadow.normalBias=.02;sun.shadow.radius=3;
+scene.add(sun);
+
+/* ---------------- vật liệu ---------------- */
+const mat=(c,rough=.5,metal=0,extra={})=>new THREE.MeshStandardMaterial({color:lin(...c),roughness:rough,metalness:metal,...extra});
+// Kính phòng thí nghiệm: khúc xạ rõ (thickness), phản chiếu mạnh (clearcoat) và viền xanh lục đậm dần ở mép theo góc nhìn
+// (thủy tinh thật trông dày và có màu ở mép, chỉ trong suốt khi nhìn thẳng)
+const glass=new THREE.MeshPhysicalMaterial({color:lin(.9,.98,.95),roughness:.05,metalness:0,transmission:1,thickness:.08,ior:1.5,
+  attenuationColor:lin(.6,.86,.8),attenuationDistance:.5,clearcoat:1,clearcoatRoughness:.04,specularIntensity:1,envMapIntensity:2.2});
+glass.onBeforeCompile=sh=>{
+  sh.fragmentShader=sh.fragmentShader.replace('#include <dithering_fragment>',`#include <dithering_fragment>
+  float rim=pow(1.0-abs(dot(normalize(normal),normalize(vViewPosition))),2.5);
+  gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.10,.24,.21),rim*.5);`);
+};
+// Kính mỏng bán trong suốt cho bình tam giác đựng nước vôi: nước bên trong (xuyên sáng, khúc xạ) mới hiện được qua thành bình.
+// Giữ phản chiếu môi trường + viền đậm ở mép như kính thường.
+const glassThin=new THREE.MeshPhysicalMaterial({color:lin(.9,.98,.95),roughness:.04,metalness:0,transparent:true,opacity:.14,depthWrite:false,clearcoat:1,clearcoatRoughness:.04,envMapIntensity:2.2});
+glassThin.onBeforeCompile=sh=>{
+  sh.fragmentShader=sh.fragmentShader.replace('#include <dithering_fragment>',`#include <dithering_fragment>
+  float rim=pow(1.0-abs(dot(normalize(normal),normalize(vViewPosition))),2.5);
+  gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.10,.24,.21),rim*.55);
+  gl_FragColor.a=max(gl_FragColor.a,rim*.75);`);
+};
+// Nước để đục (không xuyên sáng): vật xuyên sáng / bán trong suốt nằm sau thành kính sẽ không hiện ra qua kính
+const limeWater=new THREE.MeshPhysicalMaterial({color:lin(.5,.72,.74),roughness:.12,metalness:0,clearcoat:1,clearcoatRoughness:.05});
+const DARK=mat([.13,.17,.18],.35,.5);
+function canvasTexture(w,h,draw){ const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t; }
+
+/* ---------------- bàn ---------------- */
+const woodTex=canvasTexture(1024,512,(x,w,h)=>{
+  x.fillStyle='#a87a50';x.fillRect(0,0,w,h);
+  for(let i=0;i<260;i++){ const y=Math.random()*h,a=.04+Math.random()*.09; x.strokeStyle=`rgba(${Math.random()<.5?'92,60,34':'214,180,140'},${a})`; x.lineWidth=1+Math.random()*3; x.beginPath(); x.moveTo(0,y); for(let k=0;k<=w;k+=32) x.lineTo(k,y+Math.sin(k*.01+i)*6); x.stroke(); }
+});
+const table=new THREE.Group();
+const top=new THREE.Mesh(new RoundedBoxGeometry(9.7,.2,4.7,3,.03),new THREE.MeshStandardMaterial({map:woodTex,roughness:.72}));
+top.position.set(0,-.12,.15);top.receiveShadow=true;table.add(top);
+for(const sx of[-1,1])for(const sz of[-1,1]){ const leg=new THREE.Mesh(new RoundedBoxGeometry(.15,2.16,.15,2,.02),DARK); leg.position.set(sx*4.4,-1.3,.15+sz*1.9); leg.castShadow=true; table.add(leg); }
+scene.add(table);
+
+/* ---------------- đồ vật (mỗi nhóm kéo được) ---------------- */
+const items={},draggables=[];
+/* Vùng chiếm chỗ trên mặt bàn (hộp theo trục, toạ độ cục bộ [x0,x1,z0,z1]) dùng cho va chạm.
+   Đèn chỉ tính phần đế: chao đèn chìa ra phía trên được phép che lên vật khác. */
+const FOOT_OVERRIDE={1:[-.47,.47,-.47,.47]};
+function footprint(n,obj){
+  if(FOOT_OVERRIDE[n]) return FOOT_OVERRIDE[n].slice();
+  // bỏ qua InstancedMesh (hạt): three.js tính hộp bao của nó theo hình gốc chưa đặt vị trí, sai kích thước
+  obj.updateMatrixWorld(true); const b=new THREE.Box3(),k=.92;
+  obj.traverse(o=>{ if(o.isMesh&&!o.isInstancedMesh){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+  return [b.min.x*k,b.max.x*k,b.min.z*k,b.max.z*k];
+}
+function addItem(n,obj,pos){
+  const g=new THREE.Group(); g.add(obj); g.position.set(...pos);
+  g.userData={item:n,home:g.position.clone(),lift:0,foot:footprint(n,obj)};
+  shadowsFor(obj);
+  scene.add(g); (items[n]=items[n]||[]).push(g); draggables.push(g);
+  return g;
+}
+function shadowsFor(obj){ obj.traverse(o=>{ if(o.isMesh){ const tr=o.material&&o.material.transmission>0; o.castShadow=!tr&&!o.material.transparent; o.receiveShadow=true; } }); }
+/* ---------------- nạp GLB ---------------- */
+// Kính và nước vôi trong ở mọi file dùng chung một vật liệu, để các dụng cụ thuỷ tinh trông thống nhất
+const SHARED={'Kinh trong':glass,'Nuoc voi trong':limeWater};
+const loader=new GLTFLoader(),glbCache={};
+function loadGLB(url){
+  glbCache[url]=glbCache[url]||new Promise((res,rej)=>loader.load(url,g=>{
+    g.scene.traverse(o=>{ if(o.isMesh&&SHARED[o.material.name]) o.material=SHARED[o.material.name]; });
+    res(g.scene);
+  },undefined,rej));
+  return glbCache[url].then(o=>o.clone(true));
+}
+const PLACE={1:[[-3.9,0,-.8]],2:[[-2.15,0,-.8]],3:[[0,0,-.8],[1.05,0,-.8]],4:[[2.1,0,-.8]],6:[[-1.55,0,1.35]],7:[[-.45,0,1.35]],8:[[.65,0,1.35]],9:[[1.8,0,1.35]],10:[[3.2,0,-.8]],11:[[4.35,0,-.8]]};
+const glbJobs=Object.entries(PLACE).flatMap(([n,spots])=>spots.map(pos=>loadGLB(GLB[n]).then(obj=>addItem(+n,obj,pos))));
+// 5 · Cảm biến CO₂: ghép 3 phần; gốc toạ độ chung nằm cách tâm màn hình 0,55 về phía đầu dò
+glbJobs.push(Promise.all(GLB[5].map(loadGLB)).then(parts=>{ const g=new THREE.Group(); parts.forEach(p=>g.add(p)); addItem(5,g,[-3.25,0,1.15]); }));
+
+/* ---------------- hạt đậu xanh (khô / nảy mầm) dựng bằng instancing ----------------
+   Hạt nảy mầm: vỏ xanh bóng nứt ra, lộ lá mầm màu kem, rễ mầm trắng ngà thon dần, cong, đầu rễ hơi nâu */
+const beanCoatGeo=new THREE.SphereGeometry(1,18,12),cotGeo=new THREE.SphereGeometry(1,14,10);
+function taperTube(points,r0,r1,tipColor){
+  const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
+  const geo=new THREE.TubeGeometry(curve,24,1,8,false),pos=geo.attributes.position,cols=[];
+  const P=new THREE.Vector3(),C=new THREE.Vector3(),base=new THREE.Color(1,1,1),tip=new THREE.Color(...tipColor),c=new THREE.Color();
+  for(let i=0;i<pos.count;i++){
+    const t=Math.floor(i/9)/24,r=r0+(r1-r0)*t;              // 9 đỉnh / vòng (radialSegments+1)
+    curve.getPointAt(Math.min(t,1),C); P.fromBufferAttribute(pos,i).sub(C).multiplyScalar(r).add(C); pos.setXYZ(i,P.x,P.y,P.z);
+    c.copy(base).lerp(tip,Math.max(0,(t-.75)/.25)); cols.push(c.r,c.g,c.b);
+  }
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(cols,3)); geo.computeVertexNormals(); return geo;
+}
+const RADICLES=[
+  [[0,0,.04],[.004,-.006,.075],[.02,-.008,.11],[.045,0,.13]],
+  [[0,0,.04],[-.01,-.004,.08],[-.03,-.006,.12],[-.04,.004,.16],[-.03,.014,.18]],
+  [[0,0,.04],[.006,-.006,.07],[.004,-.01,.1]],
+  [[0,0,.04],[.01,-.004,.085],[.035,-.006,.12],[.07,-.002,.14],[.09,.01,.15]],
+].map(p=>taperTube(p,.011,.0035,[.62,.48,.28]));
+const coatMat=new THREE.MeshPhysicalMaterial({roughness:.28,clearcoat:.6,clearcoatRoughness:.3});
+const cotMat=mat([.86,.83,.55],.55),radMat=new THREE.MeshStandardMaterial({color:lin(.93,.91,.8),roughness:.5,vertexColors:true});
+function beanCluster({count,radius,y,sprouted,coat,heap=0}){
+  const g=new THREE.Group(),pts=[];
+  for(let k=0;pts.length<count&&k<count*60;k++){
+    const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*radius,x=Math.cos(a)*r,z=Math.sin(a)*r;
+    if(pts.every(p=>Math.hypot(p[0]-x,p[1]-z)>(heap?.035:.07))) pts.push([x,z,heap?heap*(1-r/radius)*Math.random():0]);
+  }
+  const n=pts.length,coats=new THREE.InstancedMesh(beanCoatGeo,coatMat,n),cots=sprouted&&new THREE.InstancedMesh(cotGeo,cotMat,n);
+  const rads=sprouted&&RADICLES.map(geo=>new THREE.InstancedMesh(geo,radMat,n)),radCount=[0,0,0,0];
+  const M=new THREE.Matrix4(),L=new THREE.Matrix4(),q=new THREE.Quaternion(),e=new THREE.Euler(),c=new THREE.Color(),one=new THREE.Vector3(1,1,1);
+  pts.forEach(([x,z,h],i)=>{
+    e.set((Math.random()-.5)*.35,Math.random()*Math.PI*2,(Math.random()-.5)*.35); q.setFromEuler(e);
+    M.compose(new THREE.Vector3(x,y+h,z),q,one);
+    coats.setMatrixAt(i,L.copy(M).multiply(new THREE.Matrix4().makeScale(.034,.029,.045)));
+    coats.setColorAt(i,c.copy(lin(...coat[0])).lerp(lin(...coat[1]),Math.random()));
+    if(sprouted){
+      cots.setMatrixAt(i,L.copy(M).multiply(new THREE.Matrix4().compose(new THREE.Vector3(0,.004,.022),new THREE.Quaternion(),new THREE.Vector3(.024,.022,.026))));
+      const v=Math.floor(Math.random()*4); rads[v].setMatrixAt(radCount[v]++,M);
+    }
+  });
+  g.add(coats);
+  if(sprouted){ g.add(cots); rads.forEach((m,v)=>{ m.count=radCount[v]; g.add(m); }); }
+  g.traverse(o=>{ if(o.isMesh){ o.castShadow=true; o.receiveShadow=true; } });
+  return g;
+}
+const SPROUT_COAT=[[.1,.2,.025],[.2,.3,.05]],DRY_COAT=[[.12,.2,.03],[.28,.34,.06]];
+function seedDish(n,dish,pos,sprouted){
+  const g=new THREE.Group(); g.add(dish);
+  g.add(beanCluster({count:sprouted?34:55,radius:.36,y:.054,sprouted,coat:sprouted?SPROUT_COAT:DRY_COAT}));
+  addItem(n,g,pos);
+}
+glbJobs.push(loadGLB(GLB[6]).then(d=>seedDish(12,d,[3,0,1.35],true)));
+glbJobs.push(loadGLB(GLB[6]).then(d=>seedDish(13,d,[4.25,0,1.35],false)));
+
+/* ---------------- hoạt cảnh nhỏ (di chuyển mượt) ---------------- */
+const anims=[];
+function animateTo(obj,to,dur=.6,onDone,arc=0){
+  const from=obj.position.clone(),T=new THREE.Vector3(...to);
+  const a={obj,from,to:T,t:0,dur,onDone,arc}; for(let i=anims.length-1;i>=0;i--) if(anims[i].obj===obj) anims.splice(i,1); anims.push(a);
+}
+function stepAnims(dt){
+  for(let i=anims.length-1;i>=0;i--){
+    const a=anims[i]; a.t=Math.min(1,a.t+dt/a.dur); const k=a.t<.5?2*a.t*a.t:1-Math.pow(-2*a.t+2,2)/2;
+    a.obj.position.lerpVectors(a.from,a.to,k); if(a.arc) a.obj.position.y+=Math.sin(Math.PI*k)*a.arc;
+    if(a.t>=1){ anims.splice(i,1); a.onDone&&a.onDone(); }
+  }
+  return anims.length>0;
+}
+
+/* =====================================================================
+   THÍ NGHIỆM 1 · PHƯƠNG ÁN 1 — tương tác trên bàn
+   Bàn chỉ còn: 2 bình tam giác (đã có 50 ml nước vôi trong), đĩa hạt nảy mầm, 2 túi vải.
+   Thao tác: kiểm tra bình → đổ hạt vào túi 1 → nhấc nút, thả túi, đậy nút (bình 1, rồi bình 2 với túi rỗng)
+   → tua nhanh 2 giờ (nước vôi bình 1 đục dần) → phiếu số 1.
+   Bước 2 có vật lý: hạt rơi theo trọng lực vào túi, nút cao su rơi/nảy trên bàn, túi rơi qua cổ bình và đung đưa theo dây.
+   ===================================================================== */
+const PA1_ORDER=['check1','check2','seed','open1','bag1','close1','open2','bag2','close2','wait','sheet'];
+const PA1_LAYOUT={flask:[[-.9,0,-.3],[.9,0,-.3]],dish:[-2.45,0,1.2],bag:[[-.9,0,1.3],[.9,0,1.3]]};
+const PA1_VIEW={t:[-.35,.6,.45],fd:.52};
+const WATER_MILKY=lin(.93,.93,.9),WATER_TINT=lin(.8,.93,.95);
+const HANG_Y=1.3,POUCH_DROP=.8,HOLD_Y=1.8;   // điểm buộc dây ở cổ bình; túi treo thấp hơn 0,8 (đáy túi ở 0,5 — trên mặt nước 0,32)
+const pa1={active:false,i:0,checked:[false,false],seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false,onChange:null};
+let lab=null;
+function pa1Emit(msg){ dirty=true; pa1.onChange&&pa1.onChange(msg||null); }
+function oneSprout(){
+  const g=new THREE.Group(),c=new THREE.Color().copy(lin(...SPROUT_COAT[0])).lerp(lin(...SPROUT_COAT[1]),Math.random());
+  const coat=new THREE.Mesh(beanCoatGeo,new THREE.MeshPhysicalMaterial({color:c,roughness:.28,clearcoat:.6,clearcoatRoughness:.3})); coat.scale.set(.034,.029,.045); g.add(coat);
+  const cot=new THREE.Mesh(cotGeo,cotMat); cot.position.set(0,.004,.022); cot.scale.set(.024,.022,.026); g.add(cot);
+  g.add(new THREE.Mesh(RADICLES[Math.floor(Math.random()*4)],radMat));
+  g.traverse(o=>{ if(o.isMesh) o.castShadow=true; });
+  return g;
+}
+function buildLab(){
+  if(lab) return lab;
+  const flasks=(items[3]||[]).slice().sort((a,b)=>a.userData.home.x-b.userData.home.x),bag=items[9]&&items[9][0],dish=items[12]&&items[12][0];
+  if(flasks.length<2||!bag||!dish) return null;
+  const clothTex=canvasTexture(128,128,(x)=>{x.fillStyle='#e3dcc4';x.fillRect(0,0,128,128);x.strokeStyle='rgba(120,105,70,.25)';for(let i=0;i<128;i+=4){x.beginPath();x.moveTo(i,0);x.lineTo(i,128);x.stroke();x.beginPath();x.moveTo(0,i);x.lineTo(128,i);x.stroke();}});
+  const cloth=new THREE.MeshStandardMaterial({map:clothTex,roughness:.95});
+  const pouchGeo=new THREE.LatheGeometry([[0,0],[.05,.006],[.085,.035],[.1,.08],[.095,.13],[.07,.17],[.035,.19],[.022,.215],[.03,.23],[0,.232]].map(p=>new THREE.Vector2(...p)),32);
+  const waterGeo=new THREE.LatheGeometry([[0,.062],[.405,.062],[.41,.1],[.335,.32],[0,.32]].map(p=>new THREE.Vector2(...p)),48);
+  const L={flasks,bag:[bag],dish,stoppers:[],waters:[],pouches:[],rings:[],seeds:[]};
+  flasks.forEach((f,k)=>{
+    let st=null; f.traverse(o=>{ if(!st&&o.name&&o.name.replace(/_/g,' ').toLowerCase().includes('nut cao su')) st=o; });
+    st.userData.closed=st.position.clone(); st.userData.home=st.parent; L.stoppers.push(st);
+    f.traverse(o=>{ if(o.isMesh&&o.material===glass) o.material=glassThin; });
+    // nước vôi trong: xuyên sáng, khúc xạ như nước (ior 1,333), hơi ngả xanh ở chỗ dày
+    const w=new THREE.Mesh(waterGeo,new THREE.MeshPhysicalMaterial({color:lin(1,1,1),roughness:.02,metalness:0,transmission:1,thickness:.9,ior:1.333,attenuationColor:lin(.8,.93,.95),attenuationDistance:.9,specularIntensity:1,envMapIntensity:1.6}));
+    // mặt khum (vạch nước sáng ở mép) + lớp phản chiếu mỏng trên mặt nước — dấu hiệu giúp mắt nhận ra nước trong
+    const meniscus=new THREE.Mesh(new THREE.TorusGeometry(.331,.005,8,64),new THREE.MeshBasicMaterial({color:0xf2fbfa,transparent:true,opacity:.7,depthWrite:false}));
+    meniscus.rotation.x=Math.PI/2; meniscus.position.y=.322; w.add(meniscus);
+    const sheen=new THREE.Mesh(new THREE.CircleGeometry(.333,48),new THREE.MeshPhysicalMaterial({color:lin(.85,.95,.95),transparent:true,opacity:.16,roughness:.03,clearcoat:1,envMapIntensity:2.5,depthWrite:false}));
+    sheen.rotation.x=-Math.PI/2; sheen.position.y=.321; w.add(sheen);
+    w.visible=false; f.add(w); L.waters.push(w);
+    // túi treo: điểm buộc (pivot) ở cổ bình, túi + dây quay quanh điểm đó như con lắc
+    const pivot=new THREE.Group(); pivot.position.set(0,HANG_Y,0);
+    const sack=new THREE.Mesh(pouchGeo,cloth); sack.position.y=-POUCH_DROP; pivot.add(sack);
+    k===0?sack.scale.setScalar(1.12):sack.scale.set(.85,.7,.85);     // túi có hạt căng tròn, túi rỗng xẹp
+    const top=-POUCH_DROP+.232*sack.scale.y,cord=new THREE.Mesh(new THREE.CylinderGeometry(.006,.006,-top,6),mat([.85,.83,.71],.9)); cord.position.y=top/2; pivot.add(cord);
+    pivot.userData={vy:0,ax:0,az:0,vax:0,vaz:0,moving:false}; pivot.visible=false; shadowsFor(pivot); f.add(pivot); L.pouches.push(pivot);
+  });
+  // túi vải thứ hai (bình 2, không có hạt)
+  const bag2=new THREE.Group(); bag2.add(bag.children[0].clone(true)); bag2.userData={item:9,home:new THREE.Vector3(),lift:0,extra:true,foot:bag.userData.foot.slice()}; bag2.visible=false; scene.add(bag2); draggables.push(bag2); L.bag.push(bag2);
+  L.pile=beanCluster({count:26,radius:.17,y:.135,sprouted:true,coat:SPROUT_COAT,heap:.05}); L.pile.visible=false; bag.add(L.pile);
+  L.poured=new THREE.Group(); bag.add(L.poured);                    // hạt rơi thật từ đĩa sẽ nằm ở đây
+  L.dishSeeds=dish.children[0].children[1];   // [đĩa GLB, cụm hạt]
+  L.dishCounts=L.dishSeeds?L.dishSeeds.children.map(m=>m.count):[];
+  for(let k=0;k<2;k++){ const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide})); r.rotation.x=-Math.PI/2; r.position.y=.008; r.visible=false; r.renderOrder=2; scene.add(r); L.rings.push(r); }
+  lab=L; return L;
+}
+const pa1Action=()=>PA1_ORDER[pa1.i];
+const flaskOf=a=>a.endsWith('2')?1:0;
+function setTurbidity(){
+  if(!lab) return;
+  const k=Math.min(1,pa1.hours/1.5);    // bình 1 đục rõ sau khoảng 1 – 1,5 giờ; bình 2 gần như không đổi
+  // trong → đục sữa: giảm độ xuyên sáng, tăng nhám, khoảng hấp thụ ngắn lại (ánh sáng bị các hạt CaCO₃ tán xạ)
+  const set=(w,t)=>{ const m=w.material; m.transmission=1-.66*t; m.roughness=.02+.42*t; m.color.setRGB(1,1,1).lerp(WATER_MILKY,t); m.attenuationColor.copy(WATER_TINT).lerp(WATER_MILKY,t); m.attenuationDistance=.9-.78*t; };
+  set(lab.waters[0],k); set(lab.waters[1],Math.min(.06,pa1.hours*.03));
+}
+function setDishFill(f){ if(!lab||!lab.dishSeeds) return; lab.dishSeeds.children.forEach((m,i)=>{ m.count=Math.round(lab.dishCounts[i]*f); }); }
+function reseatStopper(k){ const st=lab.stoppers[k]; if(st.parent!==st.userData.home) st.userData.home.attach(st); st.rotation.set(0,0,0); st.userData.fall=null; st.userData.held=false; }
+/* đặt toàn bộ hình ảnh theo trạng thái (dùng khi vào lại phương án 1) */
+function pa1Apply(){
+  const L=lab; if(!L) return;
+  draggables.forEach(g=>{ const n=g.userData.item; g.visible=n===3||n===12||n===9; });
+  L.flasks.forEach((f,k)=>{ f.userData.home0=f.userData.home0||f.userData.home.clone(); f.userData.home.set(...PA1_LAYOUT.flask[k]); f.position.copy(f.userData.home); });
+  L.dish.userData.home0=L.dish.userData.home0||L.dish.userData.home.clone(); L.dish.userData.home.set(...PA1_LAYOUT.dish); L.dish.position.copy(L.dish.userData.home); L.dish.rotation.set(0,0,0); L.dish.userData.scripted=false;
+  L.bag.forEach((b,k)=>{ b.userData.home0=b.userData.home0||b.userData.home.clone(); b.userData.home.set(...PA1_LAYOUT.bag[k]); b.position.copy(b.userData.home); b.visible=!pa1.bagIn[k]; });
+  L.waters.forEach(w=>w.visible=true);
+  L.stoppers.forEach((s,k)=>{ reseatStopper(k); s.position.copy(pa1.open[k]?stopperAside(k):s.userData.closed); });
+  L.pouches.forEach((p,k)=>{ p.visible=pa1.bagIn[k]; p.position.y=HANG_Y; p.rotation.set(0,0,0); Object.assign(p.userData,{vy:0,ax:0,az:0,vax:0,vaz:0,moving:false}); });
+  L.seeds.length=0;
+  L.poured.visible=pa1.seeded; L.pile.visible=pa1.seeded&&!L.poured.children.length;
+  setDishFill(pa1.seeded?.45:1);
+  setTurbidity(); pa1Rings();
+}
+function stopperAside(k){ const s=lab.stoppers[k].userData.closed; return [s.x+.62*(k?1:-1),s.y-1.32,s.z+.25]; }
+function stopperWorld(k){ const st=lab.stoppers[k]; st.updateMatrixWorld(true); return new THREE.Box3().setFromObject(st).getCenter(new THREE.Vector3()); }
+function pa1Rings(){
+  const L=lab; if(!L) return; L.rings.forEach(r=>r.visible=false);
+  if(!pa1.active) return;
+  const a=pa1Action(),put=(r,x,z,s=1)=>{ r.visible=true; r.position.x=x; r.position.z=z; r.scale.setScalar(s); r.userData.base=s; },at=(r,g,s)=>put(r,g.position.x,g.position.z,s);
+  if(a==='check1'||a==='check2'||a.startsWith('open')) at(L.rings[0],L.flasks[flaskOf(a)]);
+  else if(a.startsWith('close')){ const k=flaskOf(a),p=stopperWorld(k); put(L.rings[0],p.x,p.z,.42); at(L.rings[1],L.flasks[k]); }
+  else if(a==='seed'){ at(L.rings[0],L.dish,.95); at(L.rings[1],L.bag[0],1.05); }
+  else if(a==='bag1'||a==='bag2'){ const k=flaskOf(a); at(L.rings[0],L.bag[k],1.05); at(L.rings[1],L.flasks[k]); }
+}
+function pa1Next(msg){ pa1.i=Math.min(PA1_ORDER.length-1,pa1.i+1); pa1Rings(); pa1Emit(msg); }
+let pa1Busy=false;      // đang chạy một chuỗi vật lý (đổ hạt / túi rơi / nút rơi)
+
+/* ---- đổ hạt: đĩa bay tới cạnh túi, nghiêng, từng hạt rơi theo đường ném xiên vào túi rồi nảy, nằm yên ---- */
+function startPour(){
+  const L=lab,d=L.dish,b=L.bag[0]; pa1Busy=true; d.userData.scripted=true;
+  animateTo(d,[b.position.x-.62,.42,b.position.z],.5,()=>{ L.pour={phase:'tilt',t:0,spawned:0,next:0,total:22}; },.35);
+}
+function stepPour(dt){
+  const L=lab,P=L&&L.pour; if(!P) return false;
+  const d=L.dish,b=L.bag[0]; P.t+=dt;
+  if(P.phase==='tilt'){ d.rotation.z=-Math.min(1,P.t/.35)*.95; if(P.t>=.35){ P.phase='pour'; P.t=0; } }
+  else if(P.phase==='pour'){
+    P.next-=dt;
+    while(P.next<=0&&P.spawned<P.total){
+      P.next+=.04; P.spawned++;
+      const s=oneSprout(),start=new THREE.Vector3(d.position.x+.36,d.position.y+.12,d.position.z+(Math.random()-.5)*.28);
+      const tgt=new THREE.Vector3(b.position.x+(Math.random()-.5)*.36,.104,b.position.z+(Math.random()-.5)*.5),T=.42+Math.random()*.12;
+      const v=new THREE.Vector3((tgt.x-start.x)/T,(tgt.y-start.y+.5*GRAVITY*T*T)/T,(tgt.z-start.z)/T);
+      s.position.copy(start); s.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6); scene.add(s);
+      L.seeds.push({m:s,v,spin:new THREE.Vector3((Math.random()-.5)*14,(Math.random()-.5)*14,(Math.random()-.5)*14),rest:false,bounced:false});
+      setDishFill(1-.55*P.spawned/P.total);
+    }
+    if(P.spawned>=P.total){ P.phase='untilt'; P.t=0; }
+  }
+  else if(P.phase==='untilt'){
+    d.rotation.z=-.95*Math.max(0,1-P.t/.35);
+    if(P.t>=.35){ P.phase='settle'; d.rotation.z=0; d.userData.scripted=false; animateTo(d,d.userData.home.toArray(),.5,null,.25); }
+  }
+  else if(P.phase==='settle'&&L.seeds.every(s=>s.rest)){
+    L.pour=null; L.seeds.length=0; pa1Busy=false; pa1.seeded=true; wake(b);
+    pa1Next({ok:'Đã đổ hạt nảy mầm vào túi vải 1.'});
+  }
+  return true;
+}
+function stepSeeds(dt){
+  const L=lab; if(!L||!L.seeds.length) return false;
+  const b=L.bag[0];
+  for(const s of L.seeds){
+    if(s.rest) continue;
+    s.v.y-=GRAVITY*dt; s.m.position.addScaledVector(s.v,dt);
+    s.m.rotation.x+=s.spin.x*dt; s.m.rotation.y+=s.spin.y*dt; s.m.rotation.z+=s.spin.z*dt;
+    // mặt túi + phần hạt đã chất lên (đống cao dần ở giữa)
+    const near=L.poured.children.filter(c=>Math.hypot(c.position.x-(s.m.position.x-b.position.x),c.position.z-(s.m.position.z-b.position.z))<.07).length;
+    const floorY=.104+.028+Math.min(.05,near*.012);
+    if(s.m.position.y<=floorY&&s.v.y<0){
+      s.m.position.y=floorY;
+      if(!s.bounced&&s.v.y<-.6){ s.bounced=true; s.v.y*=-.22; s.v.x*=.35; s.v.z*=.35; s.spin.multiplyScalar(.3); }
+      else{ s.rest=true; s.m.rotation.x=(Math.random()-.5)*.4; s.m.rotation.z=(Math.random()-.5)*.4; L.poured.attach(s.m); L.poured.visible=true; }
+    }
+  }
+  return true;
+}
+
+/* ---- túi rơi vào bình: rơi tự do qua cổ bình, dây căng thì giật lại (nảy) rồi đung đưa như con lắc ---- */
+function dropPouch(k){
+  const L=lab,f=L.flasks[k],b=L.bag[k],p=L.pouches[k]; pa1Busy=true;
+  b.visible=false; pa1.bagIn[k]=true;
+  p.visible=true; p.position.y=HANG_Y+.95; p.rotation.set(0,0,0);
+  Object.assign(p.userData,{vy:0,ax:(Math.random()-.5)*.1,az:(Math.random()-.5)*.1,vax:0,vaz:0,moving:true,caught:false,k});
+}
+function stepPouches(dt){
+  const L=lab; if(!L) return false; let any=false;
+  L.pouches.forEach((p,k)=>{
+    const u=p.userData; if(!p.visible||!u.moving) return; any=true;
+    u.vy-=GRAVITY*dt; p.position.y+=u.vy*dt;
+    if(p.position.y<=HANG_Y){         // dây căng: giật lại, truyền một phần động năng sang dao động ngang
+      p.position.y=HANG_Y;
+      if(u.vy<-.5){ const kick=Math.min(1.6,-u.vy*.35); u.vax+=(Math.random()-.5)*kick; u.vaz+=(Math.random()<.5?-1:1)*kick*.8; u.vy=-u.vy*.18; wake(L.flasks[k]);
+        if(!u.caught){ u.caught=true; pa1Busy=false; pa1Next({ok:k?'Túi rỗng đã treo trong bình 2 (đối chứng).':'Túi hạt đã treo trong bình 1, đáy túi không chạm nước vôi trong.'}); } }
+      else u.vy=0;
+    }
+    // con lắc: góc lệch bị giới hạn bởi thành cổ bình
+    const w2=GRAVITY/POUCH_DROP;
+    u.vax+=(-w2*Math.sin(u.ax)-1.6*u.vax)*dt; u.vaz+=(-w2*Math.sin(u.az)-1.6*u.vaz)*dt;
+    u.ax+=u.vax*dt; u.az+=u.vaz*dt;
+    const lim=.13; if(Math.abs(u.ax)>lim){ u.ax=Math.sign(u.ax)*lim; u.vax*=-.4; } if(Math.abs(u.az)>lim){ u.az=Math.sign(u.az)*lim; u.vaz*=-.4; }
+    p.rotation.x=u.ax; p.rotation.z=u.az;
+    if(u.caught&&Math.abs(u.vy)<.01&&Math.abs(u.vax)+Math.abs(u.vaz)<.01&&Math.abs(u.ax)+Math.abs(u.az)<.004){ u.moving=false; p.rotation.set(0,0,0); }
+  });
+  return any;
+}
+
+/* ---- nút cao su: cầm nhấc lên theo con trỏ; thả trên bàn thì rơi + nảy; thả đúng miệng bình thì tụt vào cổ bình ---- */
+const holdPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-HOLD_Y),holdHit=new THREE.Vector3();
+function stopperOf(obj){ if(!lab) return -1; for(let k=0;k<2;k++){ let o=obj; while(o){ if(o===lab.stoppers[k]) return k; o=o.parent; } } return -1; }
+let stopDrag=null;
+function stopperDown(k,e){
+  const a=pa1Action();
+  if(pa1Busy||anims.length) return true;
+  if(a!==`open${k+1}`&&a!==`close${k+1}`){ pa1Emit({warn:pa1Hint()}); return true; }
+  const st=lab.stoppers[k]; reseatStopper(k); scene.attach(st);
+  const c=stopperWorld(k); aim(e); raycaster.ray.intersectPlane(holdPlane,holdHit);
+  stopDrag={k,off:c.clone().sub(st.position),x0:e.clientX,y0:e.clientY,moved:0,tx:c.x,tz:c.z};   // nút bay lên nằm ngay dưới con trỏ
+  st.userData.held=true; canvas.style.cursor='grabbing'; return true;
+}
+function stopperMove(e){
+  if(!stopDrag) return false;
+  aim(e); if(!raycaster.ray.intersectPlane(holdPlane,holdHit)) return true;
+  stopDrag.tx=Math.max(TABLE_EDGE.x0+.2,Math.min(TABLE_EDGE.x1-.2,holdHit.x));
+  stopDrag.tz=Math.max(TABLE_EDGE.z0+.2,Math.min(TABLE_EDGE.z1-.2,holdHit.z));
+  stopDrag.moved=Math.max(stopDrag.moved,Math.hypot(e.clientX-stopDrag.x0,e.clientY-stopDrag.y0));
+  dirty=true; return true;
+}
+function stopperUp(){
+  if(!stopDrag) return false;
+  const {k,moved,tx,tz}=stopDrag,st=lab.stoppers[k],f=lab.flasks[k],a=pa1Action(); stopDrag=null; st.userData.held=false;
+  const mouth=Math.hypot(tx-f.position.x,tz-f.position.z)<.36;     // xét theo con trỏ (nút bám theo hơi trễ khi kéo nhanh)
+  if(moved<5){ reseatStopper(k); st.position.copy(pa1.open[k]?new THREE.Vector3(...stopperAside(k)):st.userData.closed); pa1Do(); return true; }   // chỉ bấm: làm như "làm nhanh"
+  if(mouth){      // thả đúng miệng bình
+    const home=st.userData.home,target=home.localToWorld(st.userData.closed.clone());
+    if(a.startsWith('open')) pa1Emit({warn:'Em hãy nhấc nút ra khỏi miệng bình và đặt xuống bàn.'});
+    pa1Busy=true;
+    animateTo(st,target.toArray(),.35,()=>{ reseatStopper(k); st.position.copy(st.userData.closed); pa1Busy=false; wake(f);
+      if(a.startsWith('close')){ pa1.open[k]=false; pa1Next({ok:`Đã đậy chặt bình ${k+1}, đảm bảo kín khí.`}); } else pa1Rings(); });
+    return true;
+  }
+  // thả trên bàn: rơi tự do
+  st.updateMatrixWorld(true); const bb=new THREE.Box3().setFromObject(st);
+  st.userData.fall={vy:0,bottom:bb.min.y-st.position.y,spin:(Math.random()-.5)*3,first:a.startsWith('open')};
+  pa1Busy=true; return true;
+}
+function stepStoppers(dt){
+  const L=lab; if(!L) return false; let any=false;
+  L.stoppers.forEach((st,k)=>{
+    const u=st.userData;
+    if(u.held&&stopDrag&&stopDrag.k===k){   // đang cầm: bám theo con trỏ ở độ cao HOLD_Y
+      const t=new THREE.Vector3(stopDrag.tx,HOLD_Y,stopDrag.tz).sub(stopDrag.off);
+      st.position.lerp(t,1-Math.exp(-dt*16)); any=true; return;
+    }
+    const F=u.fall; if(!F) return; any=true;
+    F.vy-=GRAVITY*dt; st.position.y+=F.vy*dt; st.rotation.y+=F.spin*dt;
+    if(st.position.y+F.bottom<=0){
+      st.position.y=-F.bottom;
+      if(F.vy<-.6){ F.vy*=-.3; F.spin*=.5; }
+      else{ u.fall=null; reseatStopper(k); pa1Busy=false;
+        if(F.first&&pa1Action()===`open${k+1}`){ pa1.open[k]=true; pa1Next({ok:`Đã nhấc nút cao su bình ${k+1} ra.`}); }
+        else{ pa1Rings(); pa1Emit({warn:pa1Hint()}); } }
+    }
+  });
+  return any;
+}
+function pa1Phys(dt){ if(!lab) return false; const a=stepPour(dt),b=stepSeeds(dt),c=stepPouches(dt),d=stepStoppers(dt); return a||b||c||d; }
+
+/* thực hiện thao tác hiện tại (học sinh làm đúng, hoặc bấm "Làm nhanh") */
+function pa1Do(){
+  const L=lab,a=pa1Action(); if(!L||pa1Busy) return;
+  if(a==='check1'||a==='check2'){ pa1.checked[flaskOf(a)]=true; pa1Next({ok:`Bình ${flaskOf(a)+1} đã có sẵn 50 ml nước vôi trong.`}); }
+  else if(a==='seed') startPour();
+  else if(a.startsWith('open')){ const k=flaskOf(a); reseatStopper(k); pa1Busy=true; animateTo(L.stoppers[k],stopperAside(k),.7,()=>{ pa1Busy=false; pa1.open[k]=true; wake(L.flasks[k]); pa1Next({ok:`Đã nhấc nút cao su bình ${k+1} ra.`}); },.5); }
+  else if(a.startsWith('close')){ const k=flaskOf(a); reseatStopper(k); pa1Busy=true; animateTo(L.stoppers[k],L.stoppers[k].userData.closed.toArray(),.7,()=>{ pa1Busy=false; pa1.open[k]=false; wake(L.flasks[k]); pa1Next({ok:`Đã đậy chặt bình ${k+1}, đảm bảo kín khí.`}); },.5); }
+  else if(a==='bag1'||a==='bag2'){
+    const k=flaskOf(a),f=L.flasks[k],b=L.bag[k]; pa1Busy=true;
+    animateTo(b,[f.position.x,1.6,f.position.z],.45,()=>dropPouch(k),.2);
+  }
+  else if(a==='wait'){ if(pa1.hours>=1) pa1Next(); }
+  dirty=true;
+}
+const scaleAnims=[];
+function animateScale(obj,to,dur=.35){ scaleAnims.push({obj,from:obj.scale.x,to,t:0,dur}); }
+function stepScale(dt){ for(let i=scaleAnims.length-1;i>=0;i--){ const a=scaleAnims[i]; a.t=Math.min(1,a.t+dt/a.dur); a.obj.scale.setScalar(a.from+(a.to-a.from)*(1-Math.pow(1-a.t,3))); if(a.t>=1) scaleAnims.splice(i,1); } return scaleAnims.length>0; }
+/* bấm vào vật khi đang ở phương án 1 → true nếu đã xử lý */
+function pa1Click(g,obj){
+  const L=lab,a=pa1Action(); if(!L||anims.length||pa1Busy) return true;
+  const flaskIdx=L.flasks.indexOf(g);
+  if((a==='check1'||a==='check2')&&flaskIdx===flaskOf(a)){ pa1Do(); return true; }
+  if((a.startsWith('open')||a.startsWith('close'))&&flaskIdx===flaskOf(a)){ pa1Do(); return true; }
+  if(flaskIdx>=0){ pa1Emit({warn:pa1Hint()}); return true; }
+  return false;
+}
+function pa1CanDrag(g){
+  const L=lab,a=pa1Action(); if(!L||anims.length||pa1Busy) return false;
+  if(a==='seed') return g===L.dish; if(a==='bag1') return g===L.bag[0]; if(a==='bag2') return g===L.bag[1];
+  return false;
+}
+function pa1Drop(g){
+  const L=lab,a=pa1Action(),near=(t,r)=>Math.hypot(g.position.x-t.position.x,g.position.z-t.position.z)<r;
+  if(a==='seed'&&near(L.bag[0],.75)){ pa1Do(); return; }
+  if((a==='bag1'||a==='bag2')&&near(L.flasks[flaskOf(a)],.6)){ pa1Do(); return; }
+  animateTo(g,g.userData.home.toArray(),.4); pa1Emit({warn:pa1Hint()});
+}
+function pa1Hint(){
+  return {check1:'Bấm vào bình 1 (có vòng sáng).',check2:'Bấm vào bình 2 (có vòng sáng).',seed:'Kéo đĩa hạt nảy mầm tới túi vải 1 rồi thả tay để đổ hạt.',open1:'Kéo nút cao su của bình 1 nhấc ra, đặt xuống bàn.',bag1:'Kéo túi vải có hạt tới miệng bình 1 rồi thả tay.',close1:'Kéo nút cao su trên bàn đặt lại vào miệng bình 1.',open2:'Kéo nút cao su của bình 2 nhấc ra, đặt xuống bàn.',bag2:'Kéo túi vải rỗng tới miệng bình 2 rồi thả tay.',close2:'Kéo nút cao su trên bàn đặt lại vào miệng bình 2.',wait:'Bấm Tua nhanh để quan sát sau 1 – 2 giờ.',sheet:'Hoàn thiện phiếu số 1.'}[pa1Action()];
+}
+function pa1Enter(){
+  if(pa1.active) return true;
+  if(!buildLab()) return false;
+  pa1.active=true; pa1Apply(); focus=0; if(under) setUnder(false); yaw=0; pitch=.62; distance=16.5; tween=true; dirty=true; return true;
+}
+function pa1Exit(){
+  if(!pa1.active) return; pa1.active=false; pa1.playing=false;
+  const L=lab; stopDrag=null; L.pour=null; L.seeds.forEach(s=>scene.remove(s.m)); L.seeds.length=0; pa1Busy=false;
+  draggables.forEach(g=>{ g.visible=!g.userData.extra; if(g.userData.home0){ g.userData.home.copy(g.userData.home0); } g.position.copy(g.userData.home); g.rotation.set(0,0,0); g.userData.lift=0; g.userData.scripted=false; });
+  L.waters.forEach(w=>w.visible=false); L.pouches.forEach(p=>p.visible=false); L.pile.visible=false; L.poured.visible=false; setDishFill(1);
+  L.stoppers.forEach((s,k)=>{ reseatStopper(k); s.position.copy(s.userData.closed); }); L.rings.forEach(r=>r.visible=false);
+  tween=true; dirty=true;
+}
+function pa1Restart(){
+  Object.assign(pa1,{i:0,checked:[false,false],seeded:false,open:[false,false],bagIn:[false,false],hours:0,playing:false}); anims.length=0;
+  if(lab){ stopDrag=null; lab.pour=null; lab.seeds.forEach(s=>scene.remove(s.m)); lab.seeds.length=0; lab.poured.clear(); pa1Busy=false; }
+  if(pa1.active){ pa1Apply(); pa1Emit(); }
+}
+function pa1Tick(dt){
+  if(!pa1.playing) return;
+  pa1.hours=Math.min(2,pa1.hours+dt*2/9);     // 2 giờ trong ~9 giây
+  if(pa1.hours>=2) pa1.playing=false;
+  setTurbidity(); pa1Emit({clock:true});
+}
+
+/* ---------------- camera (cùng cách tính với bản cũ để chấm số khớp) ---------------- */
+const TARGETS=[[0,.35,.15],[-3.9,.9,-.8],[-2.15,.15,-.5],[.525,.65,-.8],[2.1,.5,-.8],[-3.15,.15,1.5],[-1.55,.10,1.35],[-.45,.08,1.35],[.65,.01,1.35],[1.8,.05,1.35],[3.2,.5,-.8],[4.35,.65,-.8],[3,.13,1.35],[4.25,.13,1.35]];
+const FOCUS_DIST=[1,.31,.27,.27,.19,.28,.16,.13,.14,.17,.19,.22,.16,.16];
+const camera=new THREE.PerspectiveCamera(2*Math.atan(1/2.7)*180/Math.PI,1,.05,200);
+let yaw=0,pitch=.82,distance=16.5,auto=false,under=false,focus=0,tween=true,dirty=true;
+const cur={eye:new THREE.Vector3(0,12,14),target:new THREE.Vector3()},want={eye:new THREE.Vector3(),target:new THREE.Vector3()};
+function offsetOf(n){ const g=items[n]&&items[n][0]; return g?[g.position.x-g.userData.home.x,g.position.y-g.userData.home.y,g.position.z-g.userData.home.z]:[0,0,0]; }
+function computeWant(){
+  const w=canvas.clientWidth||1,h=canvas.clientHeight||1,aspect=w/h,lab1=pa1.active&&!focus;
+  const o=lab1?[0,0,0]:offsetOf(focus),t=lab1?PA1_VIEW.t:TARGETS[focus];
+  const dist=distance*(lab1?PA1_VIEW.fd:FOCUS_DIST[focus])*Math.max(1,(focus?.65:1.05)/aspect);
+  want.target.set(t[0]+o[0],t[1],t[2]+o[2]);   // chỉ theo dịch chuyển ngang
+  want.eye.set(want.target.x+Math.sin(yaw)*Math.cos(pitch)*dist,want.target.y+Math.sin(pitch)*dist,want.target.z+Math.cos(yaw)*Math.cos(pitch)*dist);
+}
+function render(){
+  const w=canvas.clientWidth,h=canvas.clientHeight; if(!w||!h) return;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){ renderer.setPixelRatio(dpr); renderer.setSize(w,h,false); }
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+  camera.position.copy(cur.eye); camera.up.set(0,1,0); camera.lookAt(cur.target);
+  table.visible=!under;
+  renderer.render(scene,camera);
+  window.bellModel&&window.bellModel.onDraw&&window.bellModel.onDraw({eye:cur.eye.toArray(),target:cur.target.toArray(),w,h,under});
+}
+/* ---------------- vật lý nhẹ: rơi, nảy, lắc lư ----------------
+   Đang cầm: nhấc lên và nghiêng theo hướng kéo. Thả tay: rơi theo trọng lực, nảy nhẹ rồi lắc lư tắt dần. */
+const GRAVITY=14,BOUNCE=.32;
+function stepPhysics(dt){
+  let moving=false;
+  for(const g of draggables){
+    const u=g.userData,base=u.home.y;
+    if(u.scripted||anims.some(a=>a.obj===g)){ u.px=g.position.x; u.pz=g.position.z; continue; }
+    const vx=u.px===undefined?0:(g.position.x-u.px)/Math.max(dt,1e-3),vz=u.pz===undefined?0:(g.position.z-u.pz)/Math.max(dt,1e-3);
+    u.px=g.position.x; u.pz=g.position.z;
+    if(u.lift>0){ g.position.y+=(base+u.lift-g.position.y)*(1-Math.exp(-dt*14)); u.vy=0; u.air=true; moving=true; }
+    else if(u.air||g.position.y>base+1e-4){
+      u.vy=(u.vy||0)-GRAVITY*dt; g.position.y+=u.vy*dt; moving=true;
+      if(g.position.y<=base){ g.position.y=base;
+        if(u.vy<-.4){ u.wob=Math.max(u.wob||0,Math.min(.07,-u.vy*.025)); u.vy=-u.vy*BOUNCE; }
+        else{ u.vy=0; u.air=false; } }
+    }
+    // nghiêng: khi cầm thì nghiêng theo vận tốc kéo; lúc nằm trên bàn thì lắc lư tắt dần sau va chạm
+    const held=u.lift>0,tx=held?Math.max(-.16,Math.min(.16,vz*.035)):0,tz=held?Math.max(-.16,Math.min(.16,-vx*.035)):0;
+    u.rx=(u.rx||0)+(tx-(u.rx||0))*(1-Math.exp(-dt*10)); u.rz=(u.rz||0)+(tz-(u.rz||0))*(1-Math.exp(-dt*10));
+    let wx=0,wz=0;
+    if(u.wob>.001){ u.wobT=(u.wobT||0)+dt*19; u.wob*=Math.exp(-dt*4.5); wx=u.wob*Math.sin(u.wobT); wz=u.wob*Math.cos(u.wobT*1.3); moving=true; } else u.wob=0;
+    const rx=u.rx+wx,rz=u.rz+wz;
+    if(Math.abs(g.rotation.x-rx)>1e-5||Math.abs(g.rotation.z-rz)>1e-5){ g.rotation.x=rx; g.rotation.z=rz; moving=true; }
+  }
+  return moving;
+}
+let last=performance.now();
+function loop(now){
+  const dt=Math.min((now-last)/1000,.05); last=now;
+  if(auto){ yaw+=dt*.22; dirty=true; }
+  computeWant();
+  if(tween){ const k=1-Math.exp(-dt*7); cur.eye.lerp(want.eye,k); cur.target.lerp(want.target,k); if(cur.eye.distanceTo(want.eye)<.002&&cur.target.distanceTo(want.target)<.002) tween=false; dirty=true; }
+  else if(!cur.eye.equals(want.eye)||!cur.target.equals(want.target)){ cur.eye.copy(want.eye); cur.target.copy(want.target); dirty=true; }
+  if(stepPhysics(dt)) dirty=true;
+  if(stepAnims(dt)) dirty=true;
+  if(stepScale(dt)) dirty=true;
+  if(pa1Phys(dt)) dirty=true;
+  pa1Tick(dt);
+  if(lab&&pa1.active&&lab.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
+  if(dirty){ dirty=false; render(); }
+  requestAnimationFrame(loop);
+}
+/* ---------------- điều khiển ---------------- */
+const rotate=document.getElementById('rotate'),view=document.getElementById('view');
+function setAuto(on){ auto=on; rotate.setAttribute('aria-pressed',String(on)); rotate.title=on?'Dừng xoay':'Tự xoay'; rotate.setAttribute('aria-label',rotate.title); }
+function setUnder(on){ under=on; pitch=on?-.48:.82; view.title=on?'Xem từ phía trước':'Xem từ dưới'; view.setAttribute('aria-label',view.title); view.setAttribute('aria-pressed',String(on)); tween=true; }
+rotate.onclick=()=>setAuto(!auto);
+view.onclick=()=>{ setAuto(false); setUnder(!under); };
+document.getElementById('reset').onclick=()=>{
+  setAuto(false); focus=0; yaw=0; distance=16.5; setUnder(false); if(pa1.active) pitch=.62;
+  draggables.forEach(g=>{ g.position.x=g.userData.home.x; g.position.z=g.userData.home.z; g.userData.lift=0; });
+  pa1Rings(); dirty=true; window.bellModel.onFocusChange&&window.bellModel.onFocusChange(0);
+};
+const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2(),floor=new THREE.Plane(new THREE.Vector3(0,1,0),0),hitP=new THREE.Vector3();
+function aim(e){ const r=canvas.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); raycaster.setFromCamera(ndc,camera); }
+const shown=o=>{ while(o){ if(!o.visible) return false; o=o.parent; } return true; };
+/* ---------------- vật lý nhẹ: va chạm trên mặt bàn ----------------
+   Vật đang kéo đẩy các vật khác ra (đẩy dây chuyền), không vật nào ra khỏi mép bàn.
+   Phương án 1: các vật khác đứng yên và chặn vật đang kéo, trừ cặp cần thả vào nhau (túi → bình, đĩa hạt → túi). */
+const TABLE_EDGE={x0:-4.8,x1:4.8,z0:-2.15,z1:2.45};
+const box=g=>{ const f=g.userData.foot,p=g.position; return [p.x+f[0],p.x+f[1],p.z+f[2],p.z+f[3]]; };
+function keepOnTable(g){ const f=g.userData.foot; g.position.x=Math.min(TABLE_EDGE.x1-f[1],Math.max(TABLE_EDGE.x0-f[0],g.position.x)); g.position.z=Math.min(TABLE_EDGE.z1-f[3],Math.max(TABLE_EDGE.z0-f[2],g.position.z)); }
+function overlap(a,b,force){
+  const A=box(a),B=box(b),dx=Math.min(A[1]-B[0],B[1]-A[0]),dz=Math.min(A[3]-B[2],B[3]-A[2]);
+  if(dx<=0||dz<=0) return null;
+  const X={axis:'x',d:dx,sign:(B[0]+B[1])>=(A[0]+A[1])?1:-1},Z={axis:'z',d:dz,sign:(B[2]+B[3])>=(A[2]+A[3])?1:-1};
+  return force?(force==='x'?X:Z):(dx<dz?X:Z);
+}
+/* đẩy g ra khỏi src; nếu bị mép bàn chặn thì trượt sang hướng còn lại */
+function shove(src,g){
+  const o=overlap(src,g); if(!o) return;
+  const prev=g.position[o.axis]; g.position[o.axis]+=o.sign*o.d; keepOnTable(g);
+  if(overlap(src,g)){ g.position[o.axis]=prev; const alt=overlap(src,g,o.axis==='x'?'z':'x'); if(alt){ g.position[alt.axis]+=alt.sign*alt.d; keepOnTable(g); } }
+  wake(g);
+}
+function passThrough(a,b){
+  if(!pa1.active||!lab) return false;
+  const act=pa1Action(),pair=(x,y)=>(a===x&&b===y)||(a===y&&b===x);
+  return (act==='seed'&&pair(lab.dish,lab.bag[0]))||(act==='bag1'&&pair(lab.bag[0],lab.flasks[0]))||(act==='bag2'&&pair(lab.bag[1],lab.flasks[1]));
+}
+function collide(mover){
+  keepOnTable(mover);
+  const others=draggables.filter(g=>g!==mover&&g.userData.foot&&shown(g)&&!passThrough(mover,g));
+  for(let it=0;it<4;it++){
+    let any=false;
+    for(const g of others){
+      const o=overlap(mover,g); if(!o) continue; any=true;
+      if(pa1.active){ mover.position[o.axis]-=o.sign*o.d; continue; }      // phương án 1: vật khác cố định
+      shove(mover,g);
+    }
+    if(!pa1.active) for(let k=0;k<6;k++){      // đẩy dây chuyền: tách các vật đang chồng lên nhau
+      let sep=false;
+      for(let i=0;i<others.length;i++) for(let j=i+1;j<others.length;j++){
+        const a=others[i],b=others[j],o=overlap(a,b); if(!o) continue; sep=true;
+        // vật xa vật đang kéo hơn thì bị đẩy tiếp; không đẩy ngược về phía vật đang kéo
+        const far=Math.hypot(b.position.x-mover.position.x,b.position.z-mover.position.z)>=Math.hypot(a.position.x-mover.position.x,a.position.z-mover.position.z);
+        if(far) shove(a,b); else shove(b,a);
+      }
+      if(!sep) break;
+    }
+    for(const g of others){ const o=overlap(mover,g); if(o) mover.position[o.axis]-=o.sign*o.d; }   // vật bị dồn vào mép bàn thì chặn lại
+    if(!any) break;
+  }
+}
+function wake(g){ g.userData.wob=Math.max(g.userData.wob||0,.035); }
+function pickHit(e){
+  if(under) return null;
+  aim(e); const hit=raycaster.intersectObjects(draggables,true).find(h=>shown(h.object)); if(!hit) return null;
+  let o=hit.object; while(o&&!(o.userData&&o.userData.item)) o=o.parent; return o?{g:o,obj:hit.object}:null;
+}
+const pick=e=>{ const h=pickHit(e); return h&&h.g; };
+function floorPoint(e){ aim(e); return raycaster.ray.intersectPlane(floor,hitP); }
+const pointers=new Map();let pinch=0,drag=null;
+canvas.addEventListener('pointerdown',e=>{
+  setAuto(false); try{ canvas.setPointerCapture(e.pointerId); }catch(err){} pointers.set(e.pointerId,{x:e.clientX,y:e.clientY}); pinch=0;
+  if(pointers.size===1){
+    const h=pickHit(e);
+    if(h&&pa1.active){
+      const sk=stopperOf(h.obj); if(sk>=0&&stopperDown(sk,e)) return;      // nút cao su: cầm nhấc lên
+      if(pa1CanDrag(h.g)){ const p=floorPoint(e); if(p){ drag={g:h.g,dx:h.g.position.x-p.x,dz:h.g.position.z-p.z}; h.g.userData.lift=.22; canvas.style.cursor='grabbing'; dirty=true; } return; }
+      if(pa1Click(h.g,h.obj)) return;
+      return;      // phương án 1: các vật khác không kéo được — kéo nền để xoay
+    }
+    const p=h&&floorPoint(e);
+    if(h&&p){ drag={g:h.g,dx:h.g.position.x-p.x,dz:h.g.position.z-p.z}; h.g.userData.lift=.22; canvas.style.cursor='grabbing'; dirty=true; return; }
+  }
+  if(drag){ drag.g.userData.lift=0; drag=null; }
+});
+canvas.addEventListener('pointermove',e=>{
+  const prev=pointers.get(e.pointerId);
+  if(!prev){ const h=pickHit(e),g=h&&h.g; canvas.style.cursor=g&&(!pa1.active||pa1CanDrag(g)||stopperOf(h.obj)>=0)?'grab':g?'pointer':'default'; return; }
+  const dx=e.clientX-prev.x,dy=e.clientY-prev.y; pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(stopperMove(e)) return;
+  if(drag){
+    const p=floorPoint(e); if(!p) return;
+    drag.g.position.x=p.x+drag.dx; drag.g.position.z=p.z+drag.dz; collide(drag.g);
+    dirty=true; return;
+  }
+  tween=false;
+  if(pointers.size===2){ const [a,b]=[...pointers.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); if(pinch) distance=Math.max(4.9,Math.min(23,distance*pinch/d)); pinch=d; }
+  else{ yaw-=dx*.008; pitch=Math.max(under?-.95:-.16,Math.min(1.08,pitch+dy*.005)); canvas.style.cursor='move'; }
+});
+['pointerup','pointercancel','lostpointercapture'].forEach(t=>canvas.addEventListener(t,e=>{
+  pointers.delete(e.pointerId); pinch=0;
+  if(stopDrag&&!pointers.size) stopperUp();
+  if(drag&&!pointers.size){ const g=drag.g; g.userData.lift=0; drag=null; if(pa1.active) pa1Drop(g); }
+  canvas.style.cursor='';
+}));
+canvas.addEventListener('wheel',e=>{ e.preventDefault(); setAuto(false); tween=false; distance=Math.max(4.9,Math.min(23,distance*Math.exp(e.deltaY*.001))); },{passive:false});
+canvas.addEventListener('keydown',e=>{
+  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-'].includes(e.key)) return;
+  e.preventDefault(); setAuto(false);
+  if(e.key==='ArrowLeft')yaw-=.1; if(e.key==='ArrowRight')yaw+=.1;
+  if(e.key==='ArrowUp')pitch=Math.min(1.08,pitch+.08); if(e.key==='ArrowDown')pitch=Math.max(under?-.95:-.16,pitch-.08);
+  if(e.key==='+'||e.key==='=')distance=Math.max(4.9,distance-.3); if(e.key==='-')distance=Math.min(23,distance+.3);
+});
+window.addEventListener('resize',()=>{ dirty=true; });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&auto) setAuto(false); });
+canvas.addEventListener('webglcontextlost',e=>{ e.preventDefault(); setAuto(false); fail('Kết nối đồ họa bị gián đoạn. Tải lại trang để tiếp tục xem.'); });
+
+/* nhãn nổi trên các vật của phương án 1 (phần giao diện vẽ, engine chỉ trả toạ độ 3D) */
+function pa1Tags(){
+  if(!pa1.active||!lab) return [];
+  const L=lab,t=[],h=pa1.hours;
+  L.flasks.forEach((f,k)=>{
+    let s=`Bình ${k+1}`;
+    if(pa1.checked[k]) s+=k===0&&h>=.6?' · vẩn đục':' · nước vôi trong';
+    t.push({text:s,p:[f.position.x,1.72,f.position.z],ok:pa1.checked[k]});
+  });
+  L.bag.forEach((b,k)=>{ if(b.visible) t.push({text:k?'Túi vải 2 (rỗng)':pa1.seeded?'Túi vải 1 · có hạt':'Túi vải 1',p:[b.position.x,.3,b.position.z]}); });
+  t.push({text:'Hạt đậu xanh nảy mầm',p:[L.dish.position.x,.42,L.dish.position.z]});
+  return t;
+}
+window.bellModel={
+  getState:()=>({yaw,pitch,distance,auto,under,focus}),
+  render:()=>{ computeWant(); cur.eye.copy(want.eye); cur.target.copy(want.target); tween=false; render(); },
+  setFocus:n=>{ focus=n; if(under) setUnder(false); else{ pitch=Math.max(pitch,-.16); tween=true; } setAuto(false); },
+  offsetOf,
+  tags:pa1Tags,
+  pa1:{
+    order:PA1_ORDER,
+    enter:pa1Enter,exit:pa1Exit,restart:pa1Restart,
+    state:()=>({i:pa1.i,action:pa1Action(),hours:pa1.hours,playing:pa1.playing,active:pa1.active}),
+    quick:()=>{ if(!anims.length) pa1Do(); },
+    play:on=>{ if(pa1Action()!=='wait'&&pa1Action()!=='sheet') return; pa1.playing=on&&pa1.hours<2; pa1Emit({clock:true}); },
+    next:()=>pa1Do(),
+    set onChange(f){ pa1.onChange=f; },
+  },
+  onDraw:null,onFocusChange:null,
+};
+window.dispatchEvent(new Event('bench3d-model'));
+requestAnimationFrame(loop);
+Promise.allSettled(glbJobs).then(rs=>{
+  rs.forEach(r=>{ if(r.status==='rejected') console.warn('Không tải được GLB',r.reason); });
+  dirty=true; window.dispatchEvent(new Event('bench3d-ready'));
+});
+</script>
+</body>
+</html>
