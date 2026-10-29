@@ -504,7 +504,7 @@ EQUIPMENT.forEach(it=>{
   pinsEl.append(b);
 });
 function currentFocus(){ return step===1?EXPS[ex].steps[si].focus:0; }
-function pinAllowed(n){ return step===0||(step===1&&ex>3&&n===currentFocus()); }   // 2a, 2b dùng bàn riêng: không chấm số theo bàn chuẩn bị
+function pinAllowed(n){ return step===0||(step===1&&ex>4&&n===currentFocus()); }   // 2a, 2b, 2c dùng bàn riêng: không chấm số theo bàn chuẩn bị
 const LIFT=46;
 function anchorOf(n){ const p=eqOf(n).p,o=model()&&model().offsetOf?model().offsetOf(n):[0,0,0]; return [p[0]+o[0],p[1]+o[1],p[2]+o[2]]; }
 function layoutPins(){
@@ -713,7 +713,8 @@ function openP2(row){
    Đo xong tất cả các bình: tự viết nồng độ CO₂ tăng hay giảm, kết luận rồi nộp → chuyển sang thí nghiệm kế tiếp. */
 const P3={
   a:{label:'a. Ánh sáng',title:'Ánh sáng ảnh hưởng đến hô hấp của hạt',rows:[['Bình 1','Không chiếu đèn'],['Bình 2','Chiếu đèn 100 W trong 2 giờ']],kl:'Ánh sáng ảnh hưởng… đến hô hấp của hạt',bench:'tn2a',ex:2,next:3,nextName:'thí nghiệm 2b'},
-  b:{label:'b. Độ ẩm',title:'Độ ẩm ảnh hưởng đến hô hấp của hạt',rows:[['Bình 1','Hạt khô'],['Bình 2','Ngâm 2 giờ rồi gạn nước'],['Bình 3','Ngâm ngập nước']],kl:'Độ ẩm ảnh hưởng… đến hô hấp của hạt',bench:'tn2b',ex:3,next:4,nextName:'thí nghiệm 2c'}
+  b:{label:'b. Độ ẩm',title:'Độ ẩm ảnh hưởng đến hô hấp của hạt',rows:[['Bình 1','Hạt khô'],['Bình 2','Ngâm 2 giờ rồi gạn nước'],['Bình 3','Ngâm ngập nước']],kl:'Độ ẩm ảnh hưởng… đến hô hấp của hạt',bench:'tn2b',ex:3,next:4,nextName:'thí nghiệm 2c'},
+  c:{label:'c. Nồng độ CO₂',title:'Nồng độ khí CO₂ ảnh hưởng đến hô hấp của hạt',rows:[['Bình 1','Bình thường'],['Bình 2','Thả que diêm đang cháy']],kl:'Nồng độ CO₂ ban đầu ảnh hưởng… đến hô hấp của hạt',bench:'tn2c',ex:4,next:null,nextName:'phiếu thực hành'}
 };
 const p3Keys=id=>P3[id].rows.flatMap((_,i)=>[1,2,3,4,5].map(m=>`p3${id}-b${i+1}-min-${m}`)).concat(P3[id].rows.map((_,i)=>`p3${id}-b${i+1}`),[`p3${id}-kl`]);
 function openP3(id,col,row){
@@ -739,6 +740,7 @@ function openP3(id,col,row){
     setVal(`p3${id}-submitted`,new Date().toLocaleString('vi-VN'));
     md.hidden=true;
     toast(`✓ Đã nộp phiếu số 3${id} · chuyển sang ${C.nextName}`);
+    if(C.next===null){ go(2,'sec3'); return; }   // thí nghiệm cuối: mở phiếu thực hành
     ex=C.next; si=0; renderStep1();
   };
 }
@@ -865,6 +867,62 @@ function renderTN2B(){
   closeTipSilently();
 }
 
+/* Thí nghiệm 2c: 2 bình hạt nảy mầm · đo bình 1 · bình 2 thả que diêm đang cháy, đậy màng bọc rồi đo. */
+function renderTN2C(){
+  const m=model();
+  const head=`<div class="xseg"><button type="button" data-g="0" aria-pressed="false">Thí nghiệm 1</button><button type="button" data-g="1" aria-pressed="true">Thí nghiệm 2</button></div>
+    <div class="xseg sub">${EXPS.map((x,i)=>x.grp===1?`<button type="button" data-x="${i}" aria-pressed="${i===4}">${x.label}</button>`:'').join('')}</div>`;
+  if(!m?.tn2c?.enter()){ setPanel(head+'<div class="panel-t">Đang tải dụng cụ cho thí nghiệm 2c…</div>'); bindExpTabs(); setActions([]); return; }
+  const s=m.tn2c.state(),f=s.flask+1,measuring=s.i===3||s.i===8;
+  // số đo không hiện ở bảng / đồng hồ / nút: học sinh tự đọc trên màn hình máy đo và tự ghi vào phiếu
+  const minute=Math.round(s.minutes),written=s.awaiting&&String(getVal(`p3c-b${f}-min-${minute}`,'')).trim()!=='';
+  const clockText=()=>`⏱ ${s.minutes.toFixed(1)} / 5 phút · bình ${f}`;
+  const signature=['2c',s.i,s.playing,s.awaiting,s.records,s.open,s.seeded,s.lit,s.matchIn,s.film,written].join(':');
+  if(panel.querySelector('#tn2cReset')&&panel.dataset.tn2c===signature){
+    if($('tn2cReading')) $('tn2cReading').textContent=`${s.minutes.toFixed(1)} / 5 phút`;
+    $('clock').textContent=clockText(); return;
+  }
+  panel.dataset.tn2c=signature;
+  const measure=`Đo trong 5 phút (tua nhanh). Hết mỗi phút máy đo dừng lại: em <span class="b">đọc số trên màn hình máy đo</span>, bấm <span class="b">Điền phiếu</span> để tự ghi vào ô của <span class="b">bình ${f}</span> trong Phiếu số 3, ghi xong mới đo tiếp.`;
+  const T=[
+    ['Mở nút hai bình',`Hai bình tam giác đã dán nhãn bình 1, bình 2. Bấm vào <span class="b">nút cao su</span> của từng bình để mở nắp (đã mở ${s.open.filter(Boolean).length}/2 bình).`],
+    ['Cho hạt nảy mầm vào bình','Kéo <span class="b">nhíp gắp</span> tới <span class="b">đĩa hạt đậu xanh nảy mầm</span>: nhíp sẽ tự gắp từng hạt, lần lượt bỏ vào bình 1 và bình 2 để hai bình có cùng lượng hạt.'],
+    ['Lắp cảm biến vào bình 1','Kéo <span class="b">đầu dò cảm biến</span> tới miệng <span class="b">bình 1</span> để đo nồng độ CO₂, tương tự phương án 2 của Thí nghiệm 1.'],
+    ['Đo nồng độ CO₂ ở bình 1',measure,'Bắt đầu đo'],
+    ['Đốt que diêm','Bấm vào <span class="b">hộp diêm</span> để quẹt một que diêm cho cháy.'],
+    ['Thả que diêm vào bình 2','Kéo <span class="b">que diêm đang cháy</span> tới miệng <span class="b">bình 2</span> rồi thả tay: que diêm rơi vào bình và tắt dần.'],
+    ['Đậy nhanh bằng màng bọc','Kéo <span class="b">màng bọc thực phẩm</span> tới <span class="b">bình 2</span> để đậy nhanh, kín miệng bình.'],
+    ['Chuyển cảm biến sang bình 2','Kéo <span class="b">đầu dò</span> từ bình 1 sang miệng <span class="b">bình 2</span> (xuyên qua màng bọc) để đo tương tự.'],
+    ['Đo nồng độ CO₂ ở bình 2',measure,'Bắt đầu đo'],
+    ['Hoàn thiện Phiếu số 3','Đã đo xong hai bình. Mở phiếu để kiểm tra số liệu, tự viết nồng độ CO₂ tăng hay giảm ở mỗi bình, viết kết luận rồi nộp phiếu.','Mở Phiếu số 3']
+  ][s.i];
+  const reading=measuring?`<div class="panel-t" id="tn2cReading">${s.minutes.toFixed(1)} / 5 phút</div><div class="panel-x">${s.awaiting?(written?`Đã ghi phút ${minute} của bình ${f} vào phiếu. Bấm <span class="b">Đo phút tiếp theo</span>.`:`Hết phút ${minute}: đọc số trên màn hình máy đo, bấm <span class="b">Điền phiếu</span> để ghi vào phiếu rồi mới đo tiếp.`):`Bình ${f}: đã đo ${s.records[s.flask]}/5 phút`}</div>`:'';
+  setPanel(head+`
+    <div class="trow"><span class="panel-k">BƯỚC ${s.i<2?1:s.i<4?2:3} / 3</span><button class="back" id="tn2cReset" title="Làm lại thí nghiệm 2c" aria-label="Làm lại thí nghiệm 2c">${ICON.reset}</button></div>
+    <div class="panel-t"><div class="ttl">${T[0]}</div><div class="gd">${T[1]}</div></div>
+    ${s.act?`<div class="panel-x"><div class="hrow"><span class="hint">${HOW[s.how]}</span><button type="button" class="quick-act" id="tn2cQuick" title="Làm nhanh thao tác này">⚡ Làm nhanh</button></div></div>`:''}
+    ${reading}
+    <div class="note">Số liệu minh họa. Mốc tham chiếu trong bài: CO₂ không khí 0,04% (400 ppm).</div>`);
+  bindExpTabs();
+  $('tn2cReset').onclick=()=>{ if(confirm('Làm lại thí nghiệm 2c? Số liệu đã ghi trong phiếu vẫn được giữ.')) m.tn2c.restart(); };
+  if($('tn2cQuick')) $('tn2cQuick').onclick=()=>m.tn2c.quick();
+  let acts=[];
+  if(measuring){
+    // hết một phút: chỉ còn nút Điền phiếu (nổi bật); ghi xong số của phút đó mới hiện nút đo tiếp — máy không điền hộ
+    const fill=primary=>({alt:!primary,label:`${ICON.doc} Điền phiếu`,onClick:()=>{ m.tn2c.play(false); openP3('c',f,s.awaiting?minute:0); }});
+    if(s.awaiting&&!written) acts=[fill(true)];
+    else if(s.awaiting) acts=[fill(false),{label:minute<5?'▶ Đo phút tiếp theo':`Hoàn tất đo bình ${f}`,onClick:()=>{
+      if(m.tn2c.record()&&minute<5) m.tn2c.play(true); renderTN2C();
+    }}];
+    else acts=[fill(false),{label:s.playing?'⏸ Tạm dừng đo':s.minutes?'▶ Đo phút tiếp theo':T[2],onClick:()=>m.tn2c.play(!s.playing)}];
+  }else if(s.done) acts=[{label:`${ICON.doc} ${T[2]}`,onClick:()=>openP3('c')}];
+  setActions(acts);
+  const c=$('clock'); c.classList.toggle('show',measuring); c.textContent=measuring?clockText():'';
+  // đo xong hai bình thì phiếu số 3 tự bật lên một lần
+  const md=$('p1Modal'); if(!s.done) delete md.dataset.p3cauto; else if(!md.dataset.p3cauto){ md.dataset.p3cauto='1'; openP3('c'); }
+  closeTipSilently();
+}
+
 /* Phương án 2: chuẩn bị mẫu, ủ, lắp cảm biến và ghi từng phút đo. */
 function renderPA2(){
   const m=model();
@@ -925,12 +983,14 @@ function renderStep1(){
   if(ex!==1&&model()?.pa2) model().pa2.exit();
   if(ex!==2&&model()?.tn2a) model().tn2a.exit();
   if(ex!==3&&model()?.tn2b) model().tn2b.exit();
+  if(ex!==4&&model()?.tn2c) model().tn2c.exit();
   if(ex===0){ renderPA1(); return; }
   if(model()&&model().pa1) model().pa1.exit();
   updateClock();
   if(ex===1){ renderPA2(); return; }
   if(ex===2){ renderTN2A(); return; }
   if(ex===3){ renderTN2B(); return; }
+  if(ex===4){ renderTN2C(); return; }
   const E=EXPS[ex],n=E.steps.length,s=E.steps[si],it=eqOf(s.focus);
   const grpBtns=['Thí nghiệm 1','Thí nghiệm 2'].map((t,g)=>`<button type="button" data-g="${g}" aria-pressed="${E.grp===g}">${t}</button>`).join('');
   const subBtns=EXPS.map((x,i)=>x.grp===E.grp?`<button type="button" data-x="${i}" aria-pressed="${i===ex}">${x.label}</button>`:'').join('');
@@ -1046,6 +1106,7 @@ function renderSheet(target){
       ${trendTable('b',[['Bình 1','Hạt khô'],['Bình 2','Ngâm 2 giờ rồi gạn nước'],['Bình 3','Ngâm ngập nước']])}
       <label class="fld">Kết luận${ta('p3b-kl','Độ ẩm ảnh hưởng… đến hô hấp của hạt','short')}</label>
       <h4>c. Nồng độ CO₂</h4>
+      ${getVal('p3c-submitted')?`<p class="sec-ok">✓ Đã nộp lúc ${getVal('p3c-submitted')} (từ thí nghiệm 2c)</p>`:''}
       ${trendTable('c',[['Bình 1','Bình thường'],['Bình 2','Thả que diêm đang cháy']])}
       <label class="fld">Kết luận${ta('p3c-kl','Nồng độ CO₂ ban đầu ảnh hưởng… đến hô hấp của hạt','short')}</label>
     </div>
@@ -1103,6 +1164,7 @@ function go(n,target){
   if(n!==1&&model()?.pa2) model().pa2.exit();
   if(n!==1&&model()?.tn2a) model().tn2a.exit();
   if(n!==1&&model()?.tn2b) model().tn2b.exit();
+  if(n!==1&&model()?.tn2c) model().tn2c.exit();
   step=n; stage.dataset.step=String(n);
   stepBtns.forEach((b,i)=>{ b.setAttribute('aria-pressed',String(i===n)); if(i===n) b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); if(i<n) b.classList.add('done'); });
   stepsEl.classList.remove('open');
@@ -1138,6 +1200,12 @@ function attachModel(){
   model().onDraw=c=>{ cam=c; layoutPins(); };
   model().onFocusChange=f=>{ if(f===0&&pinOn) closeTip(); };
   if(model().pa1) model().pa1.onChange=onPA1Change;
+  if(model().tn2c) model().tn2c.onChange=msg=>{
+    if(step!==1||ex!==4) return;
+    if(msg&&msg.ok) toast('✓ '+msg.ok);
+    if(msg&&msg.warn) toast(msg.warn,true);
+    renderTN2C();
+  };
   if(model().tn2b) model().tn2b.onChange=msg=>{
     if(step!==1||ex!==3) return;
     if(msg&&msg.ok) toast('✓ '+msg.ok);
@@ -1776,7 +1844,7 @@ function pa1Hover(g,brief){
   if(pa1.hover!==g){ pa1.hover=g; dirty=true; }
   if(brief&&g) hoverTimer=setTimeout(()=>{ pa1.hover=null; dirty=true; },2200);
 }
-canvas.addEventListener('pointerleave',()=>{ if(pa1.active) pa1Hover(null); if(pa2.active) pa2Hover(null); if(tn2a.active) tn2aHover(null); if(tn2b.active) tn2bHover(null); });
+canvas.addEventListener('pointerleave',()=>{ if(pa1.active) pa1Hover(null); if(pa2.active) pa2Hover(null); if(tn2a.active) tn2aHover(null); if(tn2b.active) tn2bHover(null); if(tn2c.active) tn2cHover(null); });
 function pa1Phys(dt){ if(!lab) return false; const a=stepSpoonPour(dt),b=stepSeeds(dt),c=stepPouches(dt),d=stepStoppers(dt); return a||b||c||d; }
 
 /* thực hiện thao tác hiện tại (học sinh làm đúng, hoặc bấm "Làm nhanh") */
@@ -1824,7 +1892,7 @@ function pa1Hint(){
 function pa1Enter(){
   if(pa1.active) return true;
   if(!buildLab()) return false;
-  tn2aExit(); tn2bExit(); pa1.active=true; pa1Apply(); focus=0; if(under) setUnder(false); yaw=0; pitch=.62; distance=16.5; tween=true; dirty=true; return true;
+  tn2aExit(); tn2bExit(); tn2cExit(); pa1.active=true; pa1Apply(); focus=0; if(under) setUnder(false); yaw=0; pitch=.62; distance=16.5; tween=true; dirty=true; return true;
 }
 function pa1Exit(){
   if(!pa1.active) return; pa1.active=false; pa1.playing=false;
@@ -2051,7 +2119,7 @@ function pa2Apply(){
 }
 function pa2Enter(){
   if(pa2.active)return true;if(!buildLab2())return false;
-  pa1Exit();tn2aExit();tn2bExit();pa2.active=true;document.getElementById('tags').classList.add('pa2-tags');draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;pa2Apply();return true;
+  pa1Exit();tn2aExit();tn2bExit();tn2cExit();pa2.active=true;document.getElementById('tags').classList.add('pa2-tags');draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;pa2Apply();return true;
 }
 function pa2Exit(){
   if(!pa2.active)return;pa2.active=false;pa2.playing=false;pa2.hover=null;pa2Halt();lab2.root.visible=false;document.getElementById('tags').classList.remove('pa2-tags');
@@ -2371,7 +2439,7 @@ function tn2aTick(dt){
 }
 function tn2aEnter(){
   if(tn2a.active)return true;if(!buildLab3())return false;
-  pa1Exit();pa2Exit();tn2bExit();tn2a.active=true;lab3.root.visible=true;document.getElementById('tags').classList.add('pa2-tags');
+  pa1Exit();pa2Exit();tn2bExit();tn2cExit();tn2a.active=true;lab3.root.visible=true;document.getElementById('tags').classList.add('pa2-tags');
   draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;tn2aApply();return true;
 }
 function tn2aHalt(){
@@ -2650,7 +2718,7 @@ function tn2bTick(dt){
 }
 function tn2bEnter(){
   if(tn2b.active)return true;if(!buildLab4())return false;
-  pa1Exit();pa2Exit();tn2aExit();tn2b.active=true;lab4.root.visible=true;document.getElementById('tags').classList.add('pa2-tags');
+  pa1Exit();pa2Exit();tn2aExit();tn2cExit();tn2b.active=true;lab4.root.visible=true;document.getElementById('tags').classList.add('pa2-tags');
   draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;tn2bApply();return true;
 }
 function tn2bHalt(){
@@ -2692,6 +2760,274 @@ function tn2bTags(){
   return text?[{text,p:[c.x,b.max.y+.08,c.z]}]:[];
 }
 
+/* =====================================================================
+   THÍ NGHIỆM 2c · NỒNG ĐỘ CO₂ — bàn riêng, chỉ đặt các dụng cụ cần dùng (lấy từ bàn Chuẩn bị):
+   2 bình tam giác có nút · đĩa hạt đậu xanh nảy mầm + nhíp gắp · hộp diêm · màng bọc thực phẩm · bộ cảm biến CO₂
+   Tiến trình (tn2c.i):
+   Bước 1 · 0 mở nút hai bình · 1 nhíp gắp hạt nảy mầm vào hai bình (cùng lượng)
+   Bước 2 · 2 lắp đầu dò bình 1 · 3 đo bình 1
+   Bước 3 · 4 đốt que diêm · 5 thả que diêm đang cháy vào bình 2 · 6 đậy nhanh bình 2 bằng màng bọc · 7 chuyển đầu dò sang bình 2
+            · 8 đo bình 2 · 9 hoàn thiện phiếu số 3
+   ===================================================================== */
+const tn2c={active:false,hover:null,i:0,open:[false,false],seeded:[false,false],count:[0,0],lit:false,matchIn:false,film:false,minutes:0,playing:false,awaiting:false,records:[[],[]],probeAt:-1,onChange:null};
+const TN2C_START=[400,1500],TN2C_RATE=[384,160];   // ppm (minh hoạ): que diêm cháy làm CO₂ trong bình 2 cao sẵn → hạt hô hấp chậm lại, CO₂ tăng ít
+const TN2C_MATCH_REST=[.3,.17,.05];   // que diêm nằm trên lớp hạt: gốc que lệch +x, thân que (xoay quanh Z) chĩa về −x → nằm gọn giữa đáy bình
+const TN2C_FINAL=9,TN2C_DRAG={1:'tweezers',2:'probe',5:'match',6:'film',7:'probe'},TN2C_CLICK={0:'cork',4:'matches'};
+let lab5=null,tn2cBusy=false,tn2cDrag=null;
+const tn2cCur=()=>tn2c.i<=3?0:1;
+const tn2cPPM=()=>Math.round(TN2C_START[tn2cCur()]+TN2C_RATE[tn2cCur()]*tn2c.minutes);
+const tn2cMeasuring=()=>tn2c.i===3||tn2c.i===8;
+function tn2cEmit(msg){dirty=true;tn2c.onChange?.(msg||null);}
+function tn2cState(){
+  const drag=!!TN2C_DRAG[tn2c.i],click=!!TN2C_CLICK[tn2c.i];
+  return {i:tn2c.i,open:tn2c.open.slice(),seeded:tn2c.seeded.slice(),lit:tn2c.lit,matchIn:tn2c.matchIn,film:tn2c.film,minutes:tn2c.minutes,playing:tn2c.playing,awaiting:tn2c.awaiting,
+    records:tn2c.records.map(r=>r.length),flask:tn2cCur(),busy:tn2cBusy,act:drag||click,how:drag?'drag':click?'click':'',done:tn2c.i===TN2C_FINAL};
+}
+/* que diêm: thân gỗ mảnh, đầu đỏ; ngọn lửa (hai lớp nón phát sáng) + ánh sáng cam nhấp nháy */
+function makeMatch(){
+  const g=new THREE.Group();
+  const stick=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.42,8),mat([.86,.72,.48],.7));stick.position.y=.21;g.add(stick);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.022,12,10),mat([.55,.08,.05],.5));head.scale.set(1,1.4,1);head.position.y=.43;g.add(head);
+  const flame=new THREE.Group();flame.position.y=.47;g.add(flame);
+  const outer=new THREE.Mesh(new THREE.ConeGeometry(.045,.16,16,1,true),new THREE.MeshBasicMaterial({color:0xffa53a,transparent:true,opacity:.75,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+  const inner=new THREE.Mesh(new THREE.ConeGeometry(.022,.09,12,1,true),new THREE.MeshBasicMaterial({color:0xfff2b0,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+  outer.position.y=.07;inner.position.y=.04;flame.add(outer,inner);
+  const light=new THREE.PointLight(0xffa040,0,2.2,1.5);light.position.y=.08;flame.add(light);
+  g.scale.setScalar(1.5);   // to hơn que diêm thật một chút cho dễ thấy ngọn lửa ở góc nhìn cả bàn
+  g.userData={flame,light,head};g.traverse(o=>{if(o.isMesh)o.castShadow=false;});return g;
+}
+function buildLab5(){
+  if(lab5)return true;
+  if([2,3,7,12].some(n=>!rawGLB[SPEC[n].url])||CO2_PARTS.some(url=>!rawGLB[url])||!tweezersModel)return false;
+  const root=new THREE.Group();scene.add(root);
+  const tool=(n,pos,opt={})=>{const g=wrap(rawGLB[SPEC[n].url].clone(true),{...SPEC[n],center:true,...opt});g.position.set(...pos);root.add(g);shadowsFor(g);return g;};
+  const flasks=[[-1.4,0,-.5],[.9,0,-.5]].map(p=>{const f=tool(3,p);f.traverse(o=>{if(o.isMesh&&o.material===glass){o.material=glassThin;o.renderOrder=3;}});return f;});
+  // nút cao su gom thành vật riêng; nút mở nằm trên bàn (không bay theo bình); miệng bình đo từ nút lúc còn đậy
+  let mouth=null;
+  const corks=flasks.map((f,k)=>{
+    const st=new THREE.Group();f.add(st);f.updateMatrixWorld(true);const list=[];
+    f.traverse(o=>{if(o.isMesh&&/cork|nut cao su/i.test(o.material?.name||o.name||''))list.push(o);});list.forEach(m=>st.attach(m));
+    const b=new THREE.Box3().setFromObject(st);if(!mouth)mouth={y:b.max.y-.06,r:(b.max.x-b.min.x)/2};
+    st.userData={closed:st.position.clone(),aside:f.position.clone().add(st.position).add(new THREE.Vector3(k?-.55:.55,-b.min.y,.55)),flask:f};
+    return st;
+  });
+  const piles=flasks.map(f=>{
+    const g=new THREE.Group();g.visible=false;f.add(g);
+    for(let n=0;n<40;n++){const a=n*2.399963,r=.3*Math.sqrt(((n%20)+.5)/20),spr=oneSprout();spr.scale.setScalar(.55);
+      spr.position.set(Math.cos(a)*r,.09+Math.floor(n/20)*.036,Math.sin(a)*r);spr.rotation.set((Math.random()-.5)*.6,a,(Math.random()-.5)*.6);g.add(spr);}
+    return g;
+  });
+  const dish=tool(12,[-.25,0,1.3]);
+  const tweezers=tweezersModel.clone(true);tweezers.position.set(.75,0,1.6);root.add(tweezers);shadowsFor(tweezers);
+  const grip=new THREE.Group();grip.position.set(0,.025,-TW_TIP+.005);tweezers.add(grip);
+  const twSeed=oneSprout();twSeed.scale.setScalar(.85);twSeed.rotation.set(0,Math.PI/2,0);twSeed.visible=false;grip.add(twSeed);
+  const matches=tool(7,[1.6,0,.75]);
+  const film=tool(2,[2.25,0,-.35]);
+  // que diêm (hiện khi đã đốt) và màng bọc phủ miệng bình 2 (đĩa mỏng hơi võng + viền ôm cổ bình)
+  const match=makeMatch();match.visible=false;root.add(match);
+  const f2=flasks[1].position,filmMat=new THREE.MeshPhysicalMaterial({color:0xf4fbff,roughness:.15,transmission:.6,transparent:true,opacity:.55,side:THREE.DoubleSide,depthWrite:false});
+  const cover=new THREE.Group();cover.visible=false;cover.position.set(f2.x,mouth.y,f2.z);root.add(cover);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(mouth.r*1.25,32,8,0,Math.PI*2,0,Math.PI*.22),filmMat);cap.scale.y=.35;cover.add(cap);
+  const skirt=new THREE.Mesh(new THREE.CylinderGeometry(mouth.r*1.12,mouth.r*1.25,.16,32,1,true),filmMat);skirt.position.y=-.07;cover.add(skirt);
+  const S=makeSensor(root,[-2.3,0,.9]);
+  const attach=flasks.map(f=>sensorAttachAt(S,f));
+  const rings=[0,1].map(()=>{const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide}));r.rotation.x=-Math.PI/2;r.position.y=.008;r.visible=false;r.renderOrder=2;root.add(r);return r;});
+  lab5={root,flasks,corks,piles,dish,tweezers,grip,twSeed,twHome:tweezers.position.clone(),matches,film,filmHome:film.position.clone(),match,matchHome:new THREE.Vector3(1.6,.75,.75),cover,mouth,attach,rings,...S};
+  root.visible=false;return true;
+}
+function tn2cCorkTo(k,open,anim,onDone){
+  const L=lab5,c=L.corks[k],par=open?L.root:c.userData.flask,to=open?c.userData.aside:c.userData.closed;
+  if(c.parent!==par)par.attach(c);
+  if(anim)animateTo(c,to.toArray(),.55,onDone,.45);else{c.position.copy(to);c.rotation.set(0,0,0);}
+}
+function tn2cMatchFlame(on){const u=lab5.match.userData;u.flame.visible=on;u.light.intensity=on?1.6:0;u.head.material=on?mat([.15,.12,.1],.9):u.head.material;}
+function tn2cApply(){
+  const L=lab5;if(!L)return;
+  if(!tn2cBusy&&!tn2cDrag){
+    L.corks.forEach((c,k)=>tn2cCorkTo(k,tn2c.open[k],false));
+    L.tweezers.position.copy(L.twHome);L.tweezers.rotation.set(0,0,0);L.twSeed.visible=false;
+    L.film.position.copy(L.filmHome);L.film.rotation.set(0,0,0);
+    const at=tn2c.probeAt>=0?L.attach[tn2c.probeAt]:null;
+    L.probe.rotation.set(at?-Math.PI/2:0,0,0);L.probe.position.copy(at||L.probeHome);
+    // que diêm: đang cầm trên hộp diêm (đã đốt) · nằm trong đáy bình 2 (đã thả, đã tắt)
+    L.match.visible=tn2c.lit||tn2c.matchIn;
+    if(tn2c.matchIn){const f=L.flasks[1].position;L.match.position.set(f.x+TN2C_MATCH_REST[0],TN2C_MATCH_REST[1],f.z+TN2C_MATCH_REST[2]);L.match.rotation.set(0,.25,1.42);tn2cMatchFlame(false);}
+    else if(tn2c.lit){L.match.position.copy(L.matchHome);L.match.rotation.set(0,0,-.25);tn2cMatchFlame(true);}
+  }
+  L.piles.forEach((g,k)=>{g.visible=tn2c.count[k]>0;const n=Math.round(g.children.length*tn2c.count[k]/TN2A_TRIPS);g.children.forEach((c,j)=>c.visible=j<n);});
+  L.cover.visible=tn2c.film;
+  sensorLead(L,tn2cNearFlask());
+  const m=tn2cMeasuring();
+  sensorScreen(L,m?`${tn2cPPM()} ppm`:'— ppm',m?`${tn2c.minutes.toFixed(1)} / 5 phút · bình ${tn2cCur()+1}`:'',tn2c.awaiting?'GHI KẾT QUẢ':tn2c.playing&&m?'ĐANG ĐO':m?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
+  tn2cRings();dirty=true;
+}
+const tn2cNearFlask=()=>{const L=lab5,p=L.probe.getWorldPosition(new THREE.Vector3());return L.flasks.reduce((a,f)=>f.position.distanceTo(p)<a.position.distanceTo(p)?f:a);};
+const tn2cWorld=o=>o.getWorldPosition(new THREE.Vector3());
+function tn2cSrc(){const L=lab5,k=TN2C_DRAG[tn2c.i];return k==='tweezers'?L.tweezers:k==='probe'?L.probe:k==='match'?L.match:k==='film'?L.film:null;}
+function tn2cTarget(){const L=lab5,i=tn2c.i;return i===1?L.dish:i===2?L.flasks[0]:(i===5||i===6||i===7)?L.flasks[1]:null;}
+function tn2cRings(){
+  const L=lab5;if(!L)return;L.rings.forEach(r=>r.visible=false);
+  if(!tn2c.active||tn2cBusy)return;
+  const put=(r,o,sc)=>{const w=tn2cWorld(o);r.visible=true;r.position.set(w.x,.008,w.z);r.scale.setScalar(sc);r.userData.base=sc;};
+  if(tn2c.i===0){const k=tn2c.open.indexOf(false);if(k>=0)put(L.rings[0],L.flasks[k],1);return;}
+  if(tn2c.i===4){put(L.rings[0],L.matches,.6);return;}
+  const src=tn2cSrc();if(!src)return;
+  if(!tn2cDrag)put(L.rings[0],src,src===L.probe?.5:src===L.match?.4:.75);
+  const t=tn2cTarget();if(t)put(L.rings[1],t,1);
+}
+function tn2cHint(){
+  return ['Bấm vào nút cao su của từng bình để mở nắp.','Kéo nhíp gắp tới đĩa hạt đậu xanh nảy mầm rồi thả tay.','Kéo đầu dò cảm biến tới miệng bình 1.','','Bấm vào hộp diêm để đốt một que diêm.','Kéo que diêm đang cháy tới miệng bình 2 rồi thả tay.','Kéo màng bọc thực phẩm tới bình 2 để đậy nhanh miệng bình.','Kéo đầu dò từ bình 1 sang miệng bình 2.'][tn2c.i]||'';
+}
+function tn2cFinish(msg){tn2cBusy=false;tn2c.i++;tween=true;tn2cApply();tn2cEmit({ok:msg});}
+/* nhíp tự gắp hạt nảy mầm xen kẽ bình 1, bình 2 (như thí nghiệm 2a) */
+function tn2cGrab(){
+  const L=lab5,tw=L.tweezers,d=L.dish.position,dropped=tn2c.count.slice();tn2cBusy=true;L.rings.forEach(r=>r.visible=false);
+  const tip=(T,a)=>{const g=L.grip.position,c=Math.cos(a),sn=Math.sin(a);return [T.x,T.y-(g.y*c-g.z*sn),T.z-(g.y*sn+g.z*c)];};
+  const trip=()=>{
+    const k=dropped[0]<=dropped[1]?0:1;
+    if(dropped[k]>=TN2A_TRIPS){animateTo(tw,L.twHome.toArray(),.5,()=>tn2cFinish('Nhíp đã gắp hạt nảy mầm vào hai bình, mỗi bình cùng lượng hạt.'),.2,0);return;}
+    const pick=new THREE.Vector3(d.x+(Math.random()-.5)*.3,.3,d.z+(Math.random()-.5)*.3),f=L.flasks[k].position,top=new THREE.Vector3(f.x,1.85,f.z);
+    animateTo(tw,tip(pick,TW_DIP),.35,()=>{
+      L.twSeed.visible=true;dirty=true;
+      animateTo(tw,tip(top,0),.55,()=>{
+        L.twSeed.visible=false;dropped[k]++;const seed=oneSprout();seed.userData.tn2cSeed=true;seed.scale.setScalar(.55);seed.position.copy(L.grip.getWorldPosition(new THREE.Vector3()));L.root.add(seed);
+        animateTo(seed,[f.x,.2,f.z],.35,()=>{L.root.remove(seed);tn2c.count[k]++;tn2c.seeded[k]=true;tn2cApply();tn2cEmit();});
+        trip();
+      },.45,0);
+    },.15,TW_DIP);
+  };
+  trip();
+}
+function tn2cDo(){
+  const L=lab5;if(!tn2c.active||!L||tn2cBusy)return;
+  const i=tn2c.i,busy=()=>{tn2cBusy=true;L.rings.forEach(r=>r.visible=false);};
+  if(i===0){
+    const k=tn2c.open.indexOf(false);if(k<0)return;busy();
+    tn2cCorkTo(k,true,true,()=>{tn2c.open[k]=true;
+      if(tn2c.open.every(Boolean))tn2cFinish('Đã mở nút cả hai bình.');
+      else{tn2cBusy=false;tn2cApply();tn2cEmit({ok:`Đã mở nút bình ${k+1}. Tiếp tục với bình ${tn2c.open.indexOf(false)+1}.`});}});
+  }
+  else if(i===1)tn2cGrab();
+  else if(i===2||i===7){
+    const k=i===2?0:1;busy();
+    animateTo(L.probe,L.attach[k].toArray(),.75,()=>{tn2c.probeAt=k;tn2cFinish(k?'Đã chuyển đầu dò sang bình 2, xuyên qua màng bọc, máy đo sẵn sàng.':'Đã lắp đầu dò kín miệng bình 1, máy đo sẵn sàng.');},.45,-Math.PI/2);
+  }
+  else if(i===4){
+    // quẹt diêm: que diêm nhô lên từ hộp, bùng lửa
+    busy();tn2c.lit=true;const mt=L.match;mt.visible=true;mt.position.copy(L.matches.position).setY(.1);mt.rotation.set(0,0,-.25);tn2cMatchFlame(true);
+    mt.userData.flame.scale.setScalar(.2);
+    animateTo(mt,L.matchHome.toArray(),.45,()=>tn2cFinish('Que diêm đã cháy. Kéo que diêm thả vào bình 2.'),.15);
+  }
+  else if(i===5){
+    // thả que diêm đang cháy qua miệng bình 2: rơi xuống đáy, lửa yếu dần rồi tắt (thiếu O₂, sinh CO₂)
+    busy();const mt=L.match,f=L.flasks[1].position;
+    animateTo(mt,[f.x,L.mouth.y+.15,f.z],.5,()=>{
+      mt.rotation.set(0,0,0);tn2c.matchIn=true;tn2c.lit=false;
+      animateTo(mt,[f.x+TN2C_MATCH_REST[0],TN2C_MATCH_REST[1],f.z+TN2C_MATCH_REST[2]],.45,()=>{mt.rotation.set(0,.25,1.42);L.flow={t:0,dur:1.6,step:p=>{const fl=mt.userData.flame;fl.scale.setScalar(Math.max(.001,1-p));mt.userData.light.intensity=1.6*(1-p);},done:()=>{tn2cMatchFlame(false);tn2cFinish('Que diêm rơi vào bình 2 và tắt dần. Đậy nhanh miệng bình bằng màng bọc!');}};},0);
+    },.3);
+  }
+  else if(i===6){
+    busy();const f=L.flasks[1].position;
+    animateTo(L.film,[f.x,L.mouth.y+.35,f.z+.15],.45,()=>{tn2c.film=true;L.cover.visible=true;L.cover.scale.setScalar(.6);
+      L.flow={t:0,dur:.35,step:p=>L.cover.scale.setScalar(.6+.4*p),done:()=>animateTo(L.film,L.filmHome.toArray(),.45,()=>tn2cFinish('Đã đậy kín miệng bình 2 bằng màng bọc thực phẩm.'),.2,0)};},.3);
+  }
+  dirty=true;
+}
+function tn2cClickAt(e){
+  const L=lab5;if(!tn2c.active||!L||tn2cBusy||anims.length)return false;
+  aim(e);
+  if(tn2c.i===0){const k=[0,1].find(k=>!tn2c.open[k]&&raycaster.intersectObject(L.flasks[k],true).length);if(k===undefined)return false;
+    // mở đúng bình được bấm
+    if(k!==tn2c.open.indexOf(false)){tn2cBusy=true;L.rings.forEach(r=>r.visible=false);tn2cCorkTo(k,true,true,()=>{tn2c.open[k]=true;tn2cBusy=false;tn2cApply();tn2cEmit({ok:`Đã mở nút bình ${k+1}. Tiếp tục với bình ${tn2c.open.indexOf(false)+1}.`});});return true;}
+    tn2cDo();return true;}
+  if(tn2c.i===4&&raycaster.ray.intersectsBox(new THREE.Box3().setFromObject(L.matches).expandByScalar(.08))){tn2cDo();return true;}
+  return false;
+}
+function tn2cHit(e){
+  const o=tn2cSrc();if(!tn2c.active||!o||tn2cBusy||anims.length)return null;
+  aim(e);
+  if(o===lab5.tweezers||o===lab5.match)return raycaster.ray.intersectsBox(new THREE.Box3().setFromObject(o).expandByScalar(.1))?o:null;   // vật mảnh: bấm quanh là cầm được
+  return raycaster.intersectObject(o,true).length?o:null;
+}
+function tn2cDown(e){
+  const o=tn2cHit(e),p=o&&floorPoint(e);if(!p)return false;
+  const w=tn2cWorld(o);
+  tn2cDrag={o,y:o===lab5.probe?Math.max(lab5.probe.position.y,.45):o===lab5.match?Math.max(o.position.y,.75):.3,dx:w.x-p.x,dz:w.z-p.z,x0:e.clientX,y0:e.clientY,moved:0};
+  if(o===lab5.probe)lab5.probe.rotation.x=0;
+  tn2cRings();canvas.style.cursor='grabbing';return true;
+}
+function tn2cMove(e){
+  if(!tn2cDrag)return false;const D=tn2cDrag,p=floorPoint(e);if(!p)return true;
+  const x=Math.max(TABLE_EDGE.x0+.2,Math.min(TABLE_EDGE.x1-.2,p.x+D.dx)),z=Math.max(TABLE_EDGE.z0+.2,Math.min(TABLE_EDGE.z1-.2,p.z+D.dz));
+  const local=D.o.parent.worldToLocal(new THREE.Vector3(x,0,z));D.o.position.set(local.x,D.y,local.z);
+  D.moved=Math.max(D.moved,Math.hypot(e.clientX-D.x0,e.clientY-D.y0));
+  if(D.o===lab5.probe)sensorLead(lab5,tn2cNearFlask());dirty=true;return true;
+}
+function tn2cUp(){
+  if(!tn2cDrag)return false;const {o,moved}=tn2cDrag;tn2cDrag=null;
+  const L=lab5,w=tn2cWorld(o),t=tn2cTarget(),tw=t&&tn2cWorld(t),near=t&&Math.hypot(w.x-tw.x,w.z-tw.z)<.75;
+  if(moved>=5&&near){tn2cDo();return true;}
+  const isProbe=o===L.probe,back=o===L.tweezers?L.twHome:o===L.film?L.filmHome:o===L.match?L.matchHome:tn2c.probeAt>=0?L.attach[tn2c.probeAt]:L.probeHome;
+  tn2cBusy=true;animateTo(o,back.toArray(),.4,()=>{tn2cBusy=false;tn2cApply();},0,isProbe&&tn2c.probeAt>=0?-Math.PI/2:0);
+  tn2cEmit({warn:tn2cHint()});return true;
+}
+let tn2cUiTime=0;
+function tn2cTick(dt){
+  if(!tn2c.active||!lab5)return;
+  const L=lab5;
+  if(L.flow){const F=L.flow;F.t=Math.min(1,F.t+dt/F.dur);F.step(F.t);dirty=true;if(F.t>=1){L.flow=null;F.done();}}
+  // lửa diêm bùng lên khi vừa quẹt, rồi nhấp nháy
+  if(L.match.visible&&L.match.userData.flame.visible&&!L.flow){const fl=L.match.userData.flame,s0=fl.scale.x,t=performance.now()*.012;
+    fl.scale.set(Math.min(1,s0+dt*3)*(1+.08*Math.sin(t)),Math.min(1,s0+dt*3)*(1+.12*Math.sin(t*1.7)),Math.min(1,s0+dt*3));L.match.userData.light.intensity=1.4+.3*Math.sin(t*2.3);dirty=true;}
+  if(anims.some(a=>a.obj===L.probe))sensorLead(L,tn2cNearFlask());
+  if(!tn2c.playing)return;
+  if(tn2cMeasuring()){
+    const next=tn2c.records[tn2cCur()].length+1;tn2c.minutes=Math.min(next,tn2c.minutes+dt/3);
+    if(tn2c.minutes===next){tn2c.playing=false;tn2c.awaiting=true;}
+  }
+  tn2cApply();tn2cUiTime+=dt;if(tn2cUiTime>=.2||!tn2c.playing){tn2cUiTime=0;tn2cEmit();}
+}
+function tn2cEnter(){
+  if(tn2c.active)return true;if(!buildLab5())return false;
+  pa1Exit();pa2Exit();tn2aExit();tn2bExit();tn2c.active=true;lab5.root.visible=true;document.getElementById('tags').classList.add('pa2-tags');
+  draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;tn2cApply();return true;
+}
+function tn2cHalt(){
+  tn2cDrag=null;tn2cBusy=false;tn2c.playing=false;if(!lab5)return;
+  anims.splice(0,anims.length,...anims.filter(a=>!lab5.root.getObjectById(a.obj.id)));
+  lab5.root.children.filter(o=>o.userData.tn2cSeed).forEach(o=>lab5.root.remove(o));lab5.flow=null;
+}
+function tn2cExit(){
+  if(!tn2c.active)return;tn2c.active=false;tn2c.hover=null;tn2cHalt();lab5.root.visible=false;document.getElementById('tags').classList.remove('pa2-tags');
+  draggables.forEach(g=>g.visible=!g.userData.extra);focus=0;tween=true;dirty=true;
+}
+function tn2cLabelled(){const L=lab5;return [L.flasks[0],L.flasks[1],L.dish,L.tweezers,L.matches,L.film,L.match,L.sensor];}
+function tn2cPick(e){
+  if(!tn2c.active||!lab5)return null;
+  const list=tn2cLabelled();aim(e);const h=raycaster.intersectObjects(list,true).find(h=>shown(h.object));if(!h)return null;
+  let o=h.object;while(o&&!list.includes(o))o=o.parent;return o;
+}
+let tn2cHoverT=0;
+function tn2cHover(g,brief){
+  clearTimeout(tn2cHoverT);if(tn2c.hover!==g){tn2c.hover=g;dirty=true;}
+  if(brief&&g)tn2cHoverT=setTimeout(()=>{tn2c.hover=null;dirty=true;},2200);
+}
+function tn2cFlaskText(k){
+  const t=[`Bình ${k+1}`];
+  t.push(tn2c.seeded[k]?'hạt nảy mầm':tn2c.open[k]?'đã mở nút':'có nút');
+  if(k===0)t.push('bình thường');
+  else t.push(tn2c.film?'có que diêm đã cháy · đậy màng bọc':tn2c.matchIn?'có que diêm vừa cháy':'sẽ thả que diêm đang cháy');
+  return t.join(' · ');
+}
+function tn2cTags(){
+  if(!tn2c.active||!lab5||!tn2c.hover)return[];
+  const L=lab5,h=tn2c.hover;
+  const text=new Map([[L.flasks[0],tn2cFlaskText(0)],[L.flasks[1],tn2cFlaskText(1)],[L.dish,'Hạt đậu xanh nảy mầm'],[L.tweezers,'Nhíp gắp hạt'],
+    [L.matches,'Hộp diêm'],[L.film,'Màng bọc thực phẩm'],[L.match,tn2c.lit?'Que diêm đang cháy':'Que diêm đã tắt'],[L.sensor,'Bộ cảm biến CO₂']]).get(h);
+  const b=new THREE.Box3().setFromObject(h===L.sensor?L.sensor.children[0]:h),c=b.getCenter(new THREE.Vector3());
+  return text?[{text,p:[c.x,b.max.y+.08,c.z]}]:[];
+}
+
 /* ---------------- camera (cùng cách tính với bản cũ để chấm số khớp) ---------------- */
 const TARGETS=[[0,.35,.15],[-3.3,1.3,-.8],[-2.15,.15,-.5],[.525,.65,-.8],[2.1,.5,-.8],[-3.15,.15,1.5],[-1.55,.10,1.35],[-.45,.08,1.35],[.65,.01,1.35],[1.8,.05,1.35],[3.2,.5,-.8],[4.35,.65,-.8],[3,.13,1.35],[4.25,.13,1.35]];
 const FOCUS_DIST=[1,.31,.27,.27,.19,.28,.16,.13,.14,.17,.19,.22,.16,.16];
@@ -2701,8 +3037,8 @@ const cur={eye:new THREE.Vector3(0,12,14),target:new THREE.Vector3()},want={eye:
 function offsetOf(n){ const g=items[n]&&items[n][0]; return g?[g.position.x-g.userData.home.x,g.position.y-g.userData.home.y,g.position.z-g.userData.home.z]:[0,0,0]; }
 function computeWant(){
   const w=canvas.clientWidth||1,h=canvas.clientHeight||1,aspect=w/h,lab1=pa1.active&&!focus;
-  const bench=pa2.active||tn2a.active||tn2b.active;   // bàn riêng của phương án 2 / thí nghiệm 2a: nhìn toàn bàn, không cận cảnh theo dụng cụ
-  const o=lab1||bench?[0,0,0]:offsetOf(focus),t=pa2.active?[innerWidth>820?.55:-.4,.45,.2]:tn2a.active||tn2b.active?[innerWidth>820?.35:-.6,.55,.3]:lab1?PA1_VIEW.t:TARGETS[focus];
+  const bench=pa2.active||tn2a.active||tn2b.active||tn2c.active;   // bàn riêng của phương án 2 / thí nghiệm 2a: nhìn toàn bàn, không cận cảnh theo dụng cụ
+  const o=lab1||bench?[0,0,0]:offsetOf(focus),t=pa2.active?[innerWidth>820?.55:-.4,.45,.2]:tn2a.active||tn2b.active||tn2c.active?[innerWidth>820?.35:-.6,.55,.3]:lab1?PA1_VIEW.t:TARGETS[focus];
   const dist=distance*(bench?.65:lab1?PA1_VIEW.fd:FOCUS_DIST[focus])*Math.max(1,(focus?.65:1.05)/aspect);
   want.target.set(t[0]+o[0],t[1],t[2]+o[2]);   // chỉ theo dịch chuyển ngang
   want.eye.set(want.target.x+Math.sin(yaw)*Math.cos(pitch)*dist,want.target.y+Math.sin(pitch)*dist,want.target.z+Math.cos(yaw)*Math.cos(pitch)*dist);
@@ -2759,6 +3095,8 @@ function loop(now){
   pa2Tick(dt);
   tn2aTick(dt);
   tn2bTick(dt);
+  tn2cTick(dt);
+  if(lab5&&tn2c.active&&lab5.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab5.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
   if(lab4&&tn2b.active&&lab4.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab4.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
   if(lab3&&tn2a.active&&lab3.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab3.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
   if(lab2&&pa2.active&&lab2.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab2.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
@@ -2773,7 +3111,7 @@ function setUnder(on){ under=on; pitch=on?-.48:.82; view.title=on?'Xem từ phí
 rotate.onclick=()=>setAuto(!auto);
 view.onclick=()=>{ setAuto(false); setUnder(!under); };
 document.getElementById('reset').onclick=()=>{
-  setAuto(false); focus=0; yaw=0; distance=16.5; setUnder(false); if(pa1.active) pitch=.62; if(pa2.active||tn2a.active||tn2b.active) pitch=.7;
+  setAuto(false); focus=0; yaw=0; distance=16.5; setUnder(false); if(pa1.active) pitch=.62; if(pa2.active||tn2a.active||tn2b.active||tn2c.active) pitch=.7;
   draggables.forEach(g=>{ g.position.x=g.userData.home.x; g.position.z=g.userData.home.z; g.userData.lift=0; });
   if(pa1.active) pa1Rings();   // pa1Rings bật lại túi vải của phương án 1 — chỉ gọi khi đang ở phương án 1
   dirty=true; window.bellModel.onFocusChange&&window.bellModel.onFocusChange(0);
@@ -2845,6 +3183,11 @@ canvas.addEventListener('pointerdown',e=>{
       if(pa2Down(e)){ pa2Hover(null); return; }      // phương án 2: kéo vật của bước hiện tại
       if(e.pointerType!=='mouse') pa2Hover(pa2Pick(e),true);      // chạm vào dụng cụ (điện thoại): hiện tên
     }
+    if(tn2c.active){
+      if(tn2cDown(e)){ tn2cHover(null); return; }      // thí nghiệm 2c: kéo nhíp / que diêm / màng bọc / đầu dò
+      if(tn2cClickAt(e)) return;                        // bấm mở nút / đốt diêm
+      if(e.pointerType!=='mouse') tn2cHover(tn2cPick(e),true);
+    }
     if(tn2b.active){
       if(tn2bDown(e)){ tn2bHover(null); return; }      // thí nghiệm 2b: kéo đĩa hạt / cốc nước / bình 2 / đầu dò
       if(tn2bClickAt(e)) return;                        // bấm vào bình: mở / đậy nút
@@ -2869,12 +3212,13 @@ canvas.addEventListener('pointerdown',e=>{
 });
 canvas.addEventListener('pointermove',e=>{
   const prev=pointers.get(e.pointerId);
+  if(!prev&&tn2c.active){ const g=tn2cPick(e); tn2cHover(g); canvas.style.cursor=tn2cHit(e)?'grab':g?'pointer':'default'; return; }
   if(!prev&&tn2b.active){ const g=tn2bPick(e); tn2bHover(g); canvas.style.cursor=tn2bHit(e)?'grab':g?'pointer':'default'; return; }
   if(!prev&&tn2a.active){ const g=tn2aPick(e); tn2aHover(g); canvas.style.cursor=tn2aHit(e)?'grab':g?'pointer':'default'; return; }
   if(!prev&&pa2.active){ const g=pa2Pick(e); pa2Hover(g); canvas.style.cursor=pa2Hit(e)?'grab':g?'pointer':'default'; return; }
   if(!prev){ const h=pickHit(e),g=h&&h.g; if(pa1.active&&lab) pa1Hover(g); canvas.style.cursor=g&&(!pa1.active||pa1CanDrag(g)||stopperOf(h.obj)>=0)?'grab':g?'pointer':'default'; return; }
   const dx=e.clientX-prev.x,dy=e.clientY-prev.y; pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(stopperMove(e)||pa2Move(e)||tn2aMove(e)||tn2bMove(e)) return;
+  if(stopperMove(e)||pa2Move(e)||tn2aMove(e)||tn2bMove(e)||tn2cMove(e)) return;
   if(drag){
     const p=floorPoint(e); if(!p) return;
     drag.g.position.x=p.x+drag.dx; drag.g.position.z=p.z+drag.dz; collide(drag.g);
@@ -2890,6 +3234,7 @@ canvas.addEventListener('pointermove',e=>{
   if(pa2Drag&&!pointers.size) pa2Up();
   if(tn2aDrag&&!pointers.size) tn2aUp();
   if(tn2bDrag&&!pointers.size) tn2bUp();
+  if(tn2cDrag&&!pointers.size) tn2cUp();
   if(drag&&!pointers.size){ const g=drag.g; g.userData.lift=0; drag=null; if(pa1.active) pa1Drop(g); }
   canvas.style.cursor='';
 }));
@@ -2921,7 +3266,15 @@ window.bellModel={
   render:()=>{ computeWant(); cur.eye.copy(want.eye); cur.target.copy(want.target); tween=false; render(); },
   setFocus:n=>{ focus=n; if(under) setUnder(false); else{ pitch=Math.max(pitch,-.16); tween=true; } setAuto(false); },
   offsetOf,
-  tags:()=>pa2.active?pa2Tags():tn2a.active?tn2aTags():tn2b.active?tn2bTags():pa1Tags(),
+  tags:()=>pa2.active?pa2Tags():tn2a.active?tn2aTags():tn2b.active?tn2bTags():tn2c.active?tn2cTags():pa1Tags(),
+  tn2c:{enter:tn2cEnter,exit:tn2cExit,state:tn2cState,hint:tn2cHint,
+    quick:()=>{ if(!anims.length&&!lab5?.flow) tn2cDo(); },
+    play:on=>{ if(!tn2c.active||!tn2cMeasuring()||tn2c.awaiting) return; tn2c.playing=on; tn2cEmit(); },
+    record:()=>{ if(!tn2c.active||!tn2c.awaiting) return null; const k=tn2cCur(),row={flask:k,minute:Math.round(tn2c.minutes)}; tn2c.records[k].push(row); tn2c.awaiting=false;
+      if(tn2c.records[k].length===5){ tn2c.i++; tn2c.minutes=0; } tn2cApply(); return row; },
+    restart:()=>{ Object.assign(tn2c,{i:0,open:[false,false],seeded:[false,false],count:[0,0],lit:false,matchIn:false,film:false,minutes:0,playing:false,awaiting:false,records:[[],[]],probeAt:-1}); tn2cHalt(); tn2cApply(); tn2cEmit(); },
+    set onChange(f){ tn2c.onChange=f; }
+  },
   tn2b:{enter:tn2bEnter,exit:tn2bExit,state:tn2bState,hint:tn2bHint,
     quick:()=>{ if(!anims.length&&!lab4?.flow) tn2bDo(); },
     play:on=>{ if(!tn2b.active||!(tn2b.i===5||tn2bMeasuring())||tn2b.awaiting) return; tn2b.playing=on; tn2bEmit(); },
