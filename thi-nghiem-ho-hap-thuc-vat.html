@@ -1080,7 +1080,7 @@ const PA1_ORDER=['seed','open1','bag1','close1','open2','bag2','close2','wait','
 const PA1_LAYOUT={flask:[[-.9,0,-.3],[.9,0,-.3]],dish:[-2.45,0,1.2],bag:[[-.9,0,1.3],[.9,0,1.3]],spoon:[-1.55,0,1.75]};   // nhíp nằm nghỉ cách mép phải đĩa hạt (x ≈ -1,84) đủ xa
 const TW_TIP=.12*REAL/2;   // mũi nhíp cách tâm nhíp (gốc cục bộ) bấy nhiêu về phía -Z
 const PA1_VIEW={t:[-.35,.6,.45],fd:.52};
-const WATER_MILKY=lin(.93,.93,.9),WATER_TINT=lin(.8,.93,.95);
+const WATER_CLOUDY=lin(.96,.96,.96),WATER_TINT=lin(.99,.99,.99);
 const HANG_Y=1.3,POUCH_DROP=.8,HOLD_Y=1.8;   // điểm buộc dây ở cổ bình; túi treo thấp hơn 0,8 (đáy túi ở 0,5 — trên mặt nước 0,32)
 const GRAB_TARGET=window.GRAB_TARGET||6;
 const pa1={active:false,i:0,hover:null,seeded:false,scooped:false,grabCount:0,open:[false,false],bagIn:[false,false],hours:0,playing:false,onChange:null};
@@ -1182,7 +1182,8 @@ function buildLab(){
   const flasks=(items[3]||[]).slice().sort((a,b)=>a.userData.home.x-b.userData.home.x),bag=items[9]&&items[9][0],dish=items[12]&&items[12][0];
   if(flasks.length<2||!bag||!dish) return null;
   // 50 ml nước vôi trong (theo SGK): mặt nước ở y=0,137 — tích phân thể tích lòng bình (÷9,2³) ra ≈50 ml; trước đây cao tới 0,32 ≈ 150 ml
-  const waterGeo=new THREE.LatheGeometry([[0,.062],[.405,.062],[.41,.1],[.397,.137],[0,.137]].map(p=>new THREE.Vector2(...p)),48);
+  const waterSurface={y:.137,radius:.397};
+  const waterGeo=new THREE.LatheGeometry([[0,.062],[.405,.062],[.41,.1],[waterSurface.radius,waterSurface.y],[0,waterSurface.y]].map(p=>new THREE.Vector2(...p)),48);
   const L={flasks,bag:[bag],dish,stoppers:[],waters:[],pouches:[],rings:[],seeds:[]};
   flasks.forEach((f,k)=>{
     // nút cao su nằm chung khối với bình → gom các mặt vật liệu "Cork" thành một vật riêng để nhấc ra được
@@ -1190,13 +1191,12 @@ function buildLab(){
     f.traverse(o=>{ if(o.isMesh&&/cork|nut cao su/i.test(o.material.name||o.name||'')) corks.push(o); }); corks.forEach(m=>st.attach(m));
     st.userData.closed=st.position.clone(); st.userData.home=body; L.stoppers.push(st);
     f.traverse(o=>{ if(o.isMesh&&o.material===glass){ o.material=glassThin; o.renderOrder=3; } });   // kính vẽ sau túi vải (cùng là vật trong suốt)
-    // nước vôi trong: xuyên sáng, khúc xạ như nước (ior 1,333), hơi ngả xanh ở chỗ dày
-    const w=new THREE.Mesh(waterGeo,new THREE.MeshPhysicalMaterial({color:lin(1,1,1),roughness:.02,metalness:0,transmission:1,thickness:.9,ior:1.333,attenuationColor:lin(.8,.93,.95),attenuationDistance:.9,specularIntensity:1,envMapIntensity:1.6}));
-    // mặt khum (vạch nước sáng ở mép) + lớp phản chiếu mỏng trên mặt nước — dấu hiệu giúp mắt nhận ra nước trong
-    const meniscus=new THREE.Mesh(new THREE.TorusGeometry(.331,.005,8,64),new THREE.MeshBasicMaterial({color:0xf2fbfa,transparent:true,opacity:.7,depthWrite:false}));
-    meniscus.rotation.x=Math.PI/2; meniscus.position.y=.322; w.add(meniscus);
-    const sheen=new THREE.Mesh(new THREE.CircleGeometry(.333,48),new THREE.MeshPhysicalMaterial({color:lin(.85,.95,.95),transparent:true,opacity:.16,roughness:.03,clearcoat:1,envMapIntensity:2.5,depthWrite:false}));
-    sheen.rotation.x=-Math.PI/2; sheen.position.y=.321; w.add(sheen);
+    // Nước không màu; độ dày quang học khớp lớp nước thực tế, tránh hấp thụ màu quá mạnh.
+    const w=new THREE.Mesh(waterGeo,new THREE.MeshPhysicalMaterial({color:lin(1,1,1),roughness:.02,metalness:0,transmission:1,thickness:waterSurface.y-.062,ior:1.333,attenuationColor:WATER_TINT.clone(),attenuationDistance:2,specularIntensity:1,envMapIntensity:1}));
+    // Chỉ nhấn nhẹ mép nước; mặt khối nước đã có phản chiếu vật lý.
+    // Không phủ thêm đĩa trắng lên mặt nước vì sẽ khiến nước trong trông đục ngay từ đầu.
+    const meniscus=new THREE.Mesh(new THREE.TorusGeometry(waterSurface.radius-.005,.005,8,64),new THREE.MeshBasicMaterial({color:0xf2fbfa,transparent:true,opacity:.35,depthWrite:false}));
+    meniscus.rotation.x=Math.PI/2; meniscus.position.y=waterSurface.y+.002; w.add(meniscus);
     w.visible=false; f.add(w); L.waters.push(w);
     // túi treo: điểm buộc (pivot) ở cổ bình, túi + dây quay quanh điểm đó như con lắc
     const pivot=new THREE.Group(); pivot.position.set(0,HANG_Y,0);
@@ -1224,10 +1224,21 @@ const pa1Action=()=>PA1_ORDER[pa1.i];
 const flaskOf=a=>a.endsWith('2')?1:0;
 function setTurbidity(){
   if(!lab) return;
-  const k=Math.min(1,pa1.hours/1.5);    // bình 1 đục rõ sau khoảng 1 – 1,5 giờ; bình 2 gần như không đổi
-  // trong → đục sữa: giảm độ xuyên sáng, tăng nhám, khoảng hấp thụ ngắn lại (ánh sáng bị các hạt CaCO₃ tán xạ)
-  const set=(w,t)=>{ const m=w.material; m.transmission=1-.66*t; m.roughness=.02+.42*t; m.color.setRGB(1,1,1).lerp(WATER_MILKY,t); m.attenuationColor.copy(WATER_TINT).lerp(WATER_MILKY,t); m.attenuationDistance=.9-.78*t; };
-  set(lab.waters[0],k); set(lab.waters[1],Math.min(.06,pa1.hours*.03));
+  // Nhịp minh hoạ cho mốc quan sát 1–2 giờ của bài, không phải mô hình động học thực nghiệm.
+  // Giữ trong 45 phút đầu, sau đó tăng độ đục êm và đạt mức rõ nhất ở 2 giờ.
+  const progress=Math.max(0,Math.min(1,(pa1.hours-.75)/1.25));
+  const k=progress*progress*(3-2*progress);
+  // Vẩn trắng bán trong: giảm độ xuyên sáng vừa phải, giữ mặt nước bóng.
+  // Không tăng hấp thụ màu để giả độ đục: cách đó làm đáy vàng và mặt nước trắng đặc.
+  const set=(w,t)=>{
+    const m=w.material;
+    m.transmission=1-.28*t;
+    m.roughness=.02+.10*t;
+    m.color.setRGB(1,1,1).lerp(WATER_CLOUDY,t);
+    m.attenuationColor.copy(WATER_TINT);
+    m.attenuationDistance=2;
+  };
+  set(lab.waters[0],k); set(lab.waters[1],0);
 }
 function reseatStopper(k){ const st=lab.stoppers[k]; if(st.parent!==st.userData.home) st.userData.home.attach(st); st.rotation.set(0,0,0); st.userData.fall=null; st.userData.held=false; }
 /* đặt toàn bộ hình ảnh theo trạng thái (dùng khi vào lại phương án 1) */
@@ -1535,7 +1546,7 @@ function pa1Tick(dt){
   if(!pa1.playing) return;
   pa1.hours=Math.min(2,pa1.hours+dt*2/9);     // 2 giờ trong ~9 giây
   if(pa1.hours>=2) pa1.playing=false;
-  setTurbidity(); pa1Emit({clock:true});
+  setTurbidity(); dirty=true; pa1Emit({clock:true});
 }
 
 /* ---------------- camera (cùng cách tính với bản cũ để chấm số khớp) ---------------- */
@@ -1728,7 +1739,7 @@ function pa1Tags(){
   if(!pa1.active||!lab) return [];
   const L=lab,t=[],h=pa1.hours;
   // tên bình chỉ hiện khi rê chuột / chạm vào bình
-  L.flasks.forEach((f,k)=>{ if(pa1.hover===f) t.push({text:`Bình ${k+1} · 50 ml nước vôi ${k===0&&h>=.6?'(vẩn đục)':'trong'}`,p:[f.position.x,1.72,f.position.z]}); });
+  L.flasks.forEach((f,k)=>{ if(pa1.hover===f) t.push({text:`Bình ${k+1} · 50 ml nước vôi ${k===0&&h>=1?'(vẩn đục)':'trong'}`,p:[f.position.x,1.72,f.position.z]}); });
   L.bag.forEach((b,k)=>{ if(b.visible&&pa1.hover===b) t.push({text:k?'Túi vải 2 (rỗng)':pa1.seeded?'Túi vải 1 · có hạt':'Túi vải 1',p:[b.position.x,.3,b.position.z]}); });
   if(pa1.hover===L.dish) t.push({text:'Hạt đậu xanh nảy mầm',p:[L.dish.position.x,.8,L.dish.position.z]});
   if(L.spoon&&pa1.hover===L.spoon) t.push({text:pa1.scooped?'Nhíp gắp · đang kẹp hạt':'Nhíp gắp hạt',p:[L.spoon.position.x,.42,L.spoon.position.z]});
