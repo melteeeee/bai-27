@@ -1669,9 +1669,24 @@ function buildLab2(){
   const probeHome=probe.position.clone();
   const attachedPosition=new THREE.Vector3(flask.position.x-sensor.position.x-.58,1.77,flask.position.z-sensor.position.z+.105);
   paper.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.userData.c0=o.material.color.clone();}});   // giấy sẫm lại khi thấm nước
+  // Giấy thấm khi đã lót: cắt tròn vừa lòng đĩa 2, nằm sát đáy (tấm vuông gốc chỉ dùng lúc còn trên bàn / đang kéo)
+  const dishBox=new THREE.Box3().setFromObject(dishes[1]),dishR=Math.min(dishBox.max.x-dishBox.min.x,dishBox.max.z-dishBox.min.z)/2;
+  const paperDisc=new THREE.Mesh(new THREE.CircleGeometry(dishR*.88,64),new THREE.MeshStandardMaterial({color:lin(.9,.89,.84),roughness:.95}));   // giấy trơn: ảnh gốc của tấm giấy có chữ in, trải lên hình tròn sẽ lộ ra
+  paperDisc.userData.c0=paperDisc.material.color.clone();
+  paperDisc.rotation.x=-Math.PI/2;paperDisc.position.y=.018;paperDisc.receiveShadow=true;paperDisc.visible=false;dishes[1].add(paperDisc);
+  // Dây đầu dò khi đầu dò rời chỗ: vẽ lại bằng ống mềm võng tự nhiên (giữ nguyên đầu nối ở cuộn dây), thay cho kéo giãn lưới dây gốc
+  let cable=null;
+  if(lead){
+    const o=lead.original,start=new THREE.Vector3();let n=0;
+    for(let i=0;i<o.length;i+=3)if(o[i]<-1.16){start.x+=o[i];start.y+=o[i+1];start.z+=o[i+2];n++;}
+    start.divideScalar(Math.max(1,n));
+    let yMin=Infinity,yMax=-Infinity;for(let i=0;i<o.length;i+=3)if(o[i]>-.6&&o[i]<0){yMin=Math.min(yMin,o[i+1]);yMax=Math.max(yMax,o[i+1]);}
+    cable={start,radius:Math.max(.008,Math.min(.03,(yMax-yMin)/2)),mesh:new THREE.Mesh(new THREE.BufferGeometry(),lead.mesh.material)};
+    cable.mesh.castShadow=true;cable.mesh.visible=false;lead.mesh.parent.add(cable.mesh);
+  }
   const homes=new Map([[paper,paper.position.clone()],[stock,stock.position.clone()],[water,water.position.clone()],[dishes[1],dishes[1].position.clone()],[probe,probeHome]]);
   const rings=[0,1].map(()=>{const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide}));r.rotation.x=-Math.PI/2;r.position.y=.008;r.visible=false;r.renderOrder=2;root.add(r);return r;});
-  lab2={root,dishes,paper,stock,water,beaker,flask,corks,drySeeds,sprouts,pile,sensor,probe,probeHome,wire,lead,attachedPosition,display,texture,seedY,homes,rings,leadKey:''};
+  lab2={root,dishes,paper,stock,water,beaker,flask,corks,drySeeds,sprouts,pile,sensor,probe,probeHome,wire,lead,attachedPosition,display,texture,seedY,homes,rings,paperDisc,cable,leadKey:''};
   root.visible=false;return true;
 }
 function pa2Screen(){
@@ -1684,22 +1699,34 @@ function pa2Screen(){
 function pa2Place(){
   const L=lab2;if(pa2Busy||pa2Drag)return;
   L.homes.forEach((p,o)=>{o.position.copy(p);o.rotation.set(0,0,0);});
-  if(pa2.i>=1)L.paper.position.set(-.35,.035,.65);
+  L.paper.visible=pa2.i<1;L.paperDisc.visible=pa2.i>=1;
   if(pa2.i>=6){L.probe.rotation.x=-Math.PI/2;L.probe.position.copy(L.attachedPosition);}
 }
-/* uốn đoạn dây nối đầu dò theo vị trí đầu dò hiện tại (đang kéo, đang bay, hay đã lắp lên cổ bình) */
+/* dây nối đầu dò: đầu dò ở chỗ cũ → dùng lưới dây gốc; đầu dò đang kéo / đã lắp lên bình → ống mềm từ cuộn dây trên bàn,
+   bò trên mặt bàn tới gần chân bình rồi võng lên, chui vào đuôi đầu dò theo hướng thân đầu dò */
 function pa2Lead(){
-  const L=lab2;if(!L?.lead)return;
-  const connector=new THREE.Vector3(.58,.105,.38),delta=connector.clone().applyEuler(L.probe.rotation).add(L.probe.position).sub(L.probeHome).sub(connector);
-  const key=delta.toArray().map(v=>v.toFixed(4)).join();if(key===L.leadKey)return;L.leadKey=key;
-  const {mesh,original}=L.lead,attr=mesh.geometry.attributes.position;
-  for(let i=0;i<attr.count;i++){
-    const x=original[i*3],y=original[i*3+1],z=original[i*3+2];
-    const t=Math.max(0,Math.min(1,(x+1.18)/1.76)),w=t*t*(3-2*t);
-    attr.setXYZ(i,x+delta.x*w,y+delta.y*w,z+delta.z*w);
+  const L=lab2;if(!L?.lead||!L.cable)return;
+  const p=L.probe,key=[...p.position.toArray(),p.rotation.x].map(v=>v.toFixed(4)).join();if(key===L.leadKey)return;L.leadKey=key;
+  const moved=p.position.distanceToSquared(L.probeHome)>1e-6||Math.abs(p.rotation.x)>1e-4;
+  L.lead.mesh.visible=!moved;L.cable.mesh.visible=moved;if(!moved){dirty=true;return;}
+  const V=THREE.Vector3,S=L.cable.start,r=L.cable.radius;
+  const end=new V(.58,.105,.38).applyEuler(p.rotation).add(p.position).sub(L.probeHome);
+  const out=new V(0,0,1).applyEuler(p.rotation),tail=end.clone().addScaledVector(out,.15);
+  // dây không đi xuyên thân bình: chạm bàn ở phía máy đo, cách tâm bình hơn bán kính đáy bình
+  const fc=L.sensor.worldToLocal(L.flask.getWorldPosition(new V())),away=new V(S.x-fc.x,0,S.z-fc.z).normalize();
+  const nearFlask=Math.hypot(tail.x-fc.x,tail.z-fc.z)<.9;
+  const land=nearFlask?fc.clone().addScaledVector(away,.85).setY(r):new V().lerpVectors(new V(tail.x,r,tail.z),new V(S.x,r,S.z),.3).setY(r);
+  const pts=[end,tail];
+  if(tail.y>.3){
+    const arc=tail.clone().addScaledVector(new V(land.x-tail.x,0,land.z-tail.z).normalize(),.3);arc.y=tail.y+.08;   // vắt ra khỏi miệng bình
+    const drop=new V(land.x,0,land.z).addScaledVector(away,-.06);drop.y=r+(tail.y-r)*.4;                          // rủ xuống cạnh bình
+    pts.push(arc,drop);
   }
-  attr.needsUpdate=true;mesh.geometry.computeVertexNormals();mesh.geometry.computeBoundingSphere();
+  pts.push(land,new V().lerpVectors(land,S,.55).setY(r),S);
+  const curve=new THREE.CatmullRomCurve3(pts,false,'centripetal');
+  L.cable.mesh.geometry.dispose();L.cable.mesh.geometry=new THREE.TubeGeometry(curve,120,r,10,false);dirty=true;
 }
+const pa2Wet=on=>[lab2.paper,lab2.paperDisc].forEach(g=>g.traverse(o=>{if(o.userData.c0)o.material.color.copy(o.userData.c0).multiplyScalar(on?.74:1);}));
 function pa2Apply(){
   if(!lab2)return;const L=lab2;L.root.visible=pa2.active;
   pa2Place();
@@ -1707,7 +1734,7 @@ function pa2Apply(){
   L.drySeeds.forEach((g,j)=>g.visible=(pa2.i>=2||pa2.sown[j])&&(j===0||pa2.days<.3)&&!(j===1&&pa2.i>=5));
   L.sprouts.forEach((g,j)=>{g.visible=j===1&&pa2.days>=.3&&pa2.i<5;g.children.forEach(s=>{s.children[1].visible=pa2.days>.5;s.children[2].scale.setScalar(Math.min(1,pa2.days/3));});});
   L.corks.forEach(c=>c.visible=pa2.i<5);
-  L.paper.traverse(o=>{if(o.userData.c0)o.material.color.copy(o.userData.c0).multiplyScalar(pa2.i>=3?.74:1);});
+  pa2Wet(pa2.i>=3);
   pa2Lead();pa2Rings();pa2Screen();dirty=true;
 }
 function pa2Enter(){
@@ -1755,7 +1782,7 @@ function pa2Do(k){
       else{pa2Busy=false;pa2Rings();pa2Emit({ok:`Đã rải hạt vào đĩa ${k+1}. Tiếp tục với đĩa ${pa2Unsown()+1}.`});}
     });
   }
-  else if(pa2.i===2)pa2Pour(L.water,pa2World(L.dishes[1]),1.1,()=>L.paper.traverse(o=>{if(o.userData.c0)o.material.color.copy(o.userData.c0).multiplyScalar(.74);}),()=>pa2Finish('Đã thêm 25 ml nước, giấy thấm ở đĩa 2 đã ẩm.'));
+  else if(pa2.i===2)pa2Pour(L.water,pa2World(L.dishes[1]),1.1,()=>pa2Wet(true),()=>pa2Finish('Đã thêm 25 ml nước, giấy thấm ở đĩa 2 đã ẩm.'));
   else if(pa2.i===4){
     L.corks.forEach(c=>c.visible=false);   // mở nút bình trước khi đổ hạt
     pa2Pour(L.dishes[1],L.flask.position,2,()=>{L.sprouts[1].visible=false;L.pile.visible=true;dirty=true;},()=>pa2Finish('Đã cho hạt nảy mầm vào bình tam giác 250 ml.'));
