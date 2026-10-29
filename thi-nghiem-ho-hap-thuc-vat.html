@@ -193,15 +193,16 @@ button:focus-visible,a:focus-visible,.pin:focus-visible{outline:3px solid #2B7FD
 .fld{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
 .addrow{align-self:flex-start;height:40px;padding:0 14px;border:1.5px dashed #A9BDB9;border-radius:10px;background:#FBFDFC;color:var(--y-btn);font-size:13px;font-weight:700;cursor:pointer}
 .addrow:hover{background:var(--y-lime-soft)}
-.modal .sheet-table tr.now th,.modal .sheet-table tr.now td{background:var(--y-lime-soft)}   /* phút cần ghi */
+.modal .sheet-table tr.now th,.modal .sheet-table tr.now td,.modal .sheet-table td.now{background:var(--y-lime-soft)}
+.sheet-table.p3 thead th:nth-child(2){width:150px}
+.p3 td textarea.trend{min-height:72px}
+.mini canvas{display:block;width:100%;height:96px;border-radius:8px;background:#FBFDFC}
+.mini-in{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:6px}
+.mini-in label{display:flex;flex-direction:column;gap:2px;font-size:10.5px;color:var(--y-mute);font-weight:600}
+.sheet-table .mini-in input{height:32px;padding:0 4px;font-size:12.5px;text-align:center;border-radius:8px}
+.modal .mini-in input.now{background:var(--y-lime-soft);border-color:var(--y-lime-b)}
 .chartbox{border:1.5px solid var(--y-line);border-radius:12px;background:#FBFDFC;padding:8px}
 .chartbox canvas{display:block;width:100%;height:180px}
-.trend{display:flex;gap:3px;padding:3px;background:#EEF3F2;border-radius:10px;flex-wrap:wrap}
-.trend button{flex:1 1 0;min-width:64px;min-height:36px;padding:4px 6px;border:0;border-radius:8px;background:transparent;color:var(--y-ink);font-size:12px;font-weight:600;line-height:1.2;cursor:pointer}
-.trend button:hover{background:#fff}
-.trend button[aria-pressed="true"]{background:var(--y-ink);color:var(--y-lime)}
-.trend button[data-v="-2"][aria-pressed="true"],.trend button[data-v="-1"][aria-pressed="true"]{background:#8A2E25;color:#fff}
-.trend button[data-v="0"][aria-pressed="true"]{background:#56645F;color:#fff}
 .sheet-foot{margin:0;font-size:13px;color:var(--y-mute)}
 .sheet-actions{position:sticky;bottom:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px;background:#fff;border-radius:16px;box-shadow:0 -2px 12px rgba(16,48,46,.08)}
 .sheet-actions .grp{display:flex;align-items:center;gap:12px}
@@ -503,7 +504,7 @@ EQUIPMENT.forEach(it=>{
   pinsEl.append(b);
 });
 function currentFocus(){ return step===1?EXPS[ex].steps[si].focus:0; }
-function pinAllowed(n){ return step===0||(step===1&&ex>1&&n===currentFocus()); }
+function pinAllowed(n){ return step===0||(step===1&&ex>3&&n===currentFocus()); }   // 2a, 2b dùng bàn riêng: không chấm số theo bàn chuẩn bị
 const LIFT=46;
 function anchorOf(n){ const p=eqOf(n).p,o=model()&&model().offsetOf?model().offsetOf(n):[0,0,0]; return [p[0]+o[0],p[1]+o[1],p[2]+o[2]]; }
 function layoutPins(){
@@ -706,6 +707,92 @@ function openP2(row){
   };
 }
 
+/* Phiếu số 3 · a. Ánh sáng bật lên trên bàn 2a: học sinh tự ghi số đọc từng phút của bình đang đo (máy không điền hộ).
+   Đo xong cả hai bình: chọn xu hướng CO₂, viết kết luận rồi nộp → chuyển sang thí nghiệm 2b. */
+const P3A_KEYS=[1,2].flatMap(b=>[1,2,3,4,5].map(m=>`p3a-b${b}-min-${m}`)).concat(['p3a-b1','p3a-b2','p3a-kl']);
+function openP3a(col,row){
+  const md=$('p1Modal'),done=model()?.tn2a?.state().i===8;
+  md.innerHTML=`<div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="p3aT">
+    <span class="sec-k">Phiếu số 3 · a. Ánh sáng</span>
+    <h2 id="p3aT">Ánh sáng ảnh hưởng đến hô hấp của hạt</h2>
+    <p class="lead">${done?'Em đã đo xong hai bình. Kiểm tra số liệu và đồ thị, cho biết nồng độ CO₂ ở mỗi bình tăng hay giảm, viết kết luận rồi nộp phiếu.':`Hết mỗi phút đo, em đọc số trên màn hình máy đo và tự ghi vào ô <b>Đồ thị minh hoạ</b> của bình ${col||'đang đo'}.`}</p>
+    ${trendTable('a',[['Bình 1','Không chiếu đèn'],['Bình 2','Chiếu đèn 100 W trong 2 giờ']])}
+    <label class="fld">Kết luận${ta('p3a-kl','Ánh sáng ảnh hưởng… đến hô hấp của hạt','short')}</label>
+    <p class="modal-msg" id="p3aMsg" role="alert"></p>
+    <div class="modal-act">${done?`<button type="button" class="btn alt" id="p3aBack">Quan sát lại</button><button type="button" class="btn" id="p3aSubmit">Nộp phiếu ${ICON.next}</button>`:`<button type="button" class="btn alt" id="p3aBack">Tiếp tục đo</button><button type="button" class="btn" id="p3aFull">${ICON.doc} Mở phiếu thực hành</button>`}</div>
+  </div>`;
+  md.hidden=false; wireFields(md); drawMinis();
+  const cell=col&&row&&md.querySelector(`[data-key="p3a-b${col}-min-${row}"]`);
+  if(cell){ cell.classList.add('now'); cell.focus(); } else md.querySelector('input,textarea').focus();
+  $('p3aBack').onclick=()=>{ md.hidden=true; if(step===1&&ex===2) renderTN2A(); };
+  if($('p3aFull')) $('p3aFull').onclick=()=>{ md.hidden=true; go(2,'sec3'); };
+  if($('p3aSubmit')) $('p3aSubmit').onclick=()=>{
+    const miss=P3A_KEYS.filter(k=>!String(getVal(k,'')).trim());
+    md.querySelectorAll('[data-key]').forEach(el=>el.classList.toggle('miss',miss.includes(el.dataset.key)));
+    if(miss.length){ $('p3aMsg').textContent='Em hãy ghi đủ số liệu 5 phút của hai bình, nồng độ CO₂ tăng hay giảm và kết luận trước khi nộp.'; md.querySelector('input.miss,textarea.miss')?.focus(); return; }
+    setVal('p3a-submitted',new Date().toLocaleString('vi-VN'));
+    md.hidden=true;
+    toast('✓ Đã nộp phiếu số 3a · chuyển sang thí nghiệm 2b');
+    ex=3; si=0; renderStep1();
+  };
+}
+/* Thí nghiệm 2a: thao tác trên bàn riêng — mở nút, cho hạt vào bình, đo bình 1, bật đèn, tua 2 giờ, đo bình 2. */
+function renderTN2A(){
+  const m=model();
+  const head=`<div class="xseg"><button type="button" data-g="0" aria-pressed="false">Thí nghiệm 1</button><button type="button" data-g="1" aria-pressed="true">Thí nghiệm 2</button></div>
+    <div class="xseg sub">${EXPS.map((x,i)=>x.grp===1?`<button type="button" data-x="${i}" aria-pressed="${i===2}">${x.label}</button>`:'').join('')}</div>`;
+  if(!m?.tn2a?.enter()){ setPanel(head+'<div class="panel-t">Đang tải dụng cụ cho thí nghiệm 2a…</div>'); bindExpTabs(); setActions([]); return; }
+  const s=m.tn2a.state(),f=s.flask+1;
+  // số đo không hiện ở bảng / đồng hồ / nút: học sinh tự đọc trên màn hình máy đo và tự ghi vào phiếu
+  const minute=Math.round(s.minutes),key=`p3a-b${f}-min-${minute}`,written=s.awaiting&&String(getVal(key,'')).trim()!=='';
+  const clockText=()=>s.i===5?`⏱ ${fmtHours(s.hours)} / 2 giờ · đèn chiếu bình 2`:`⏱ ${s.minutes.toFixed(1)} / 5 phút · bình ${f}`;
+  const signature=['2a',s.i,s.playing,s.awaiting,s.records,s.open,s.seeded,s.lamp,written].join(':');
+  if(panel.querySelector('#tn2aReset')&&panel.dataset.tn2a===signature){
+    if($('tn2aReading')) $('tn2aReading').textContent=s.i===5?`${fmtHours(s.hours)} / 2 giờ`:`${s.minutes.toFixed(1)} / 5 phút`;
+    $('clock').textContent=clockText(); return;
+  }
+  panel.dataset.tn2a=signature;
+  const measure=`Đo trong 5 phút (tua nhanh). Hết mỗi phút máy đo dừng lại: em <span class="b">đọc số trên màn hình máy đo</span>, bấm <span class="b">Điền phiếu</span> để tự ghi vào cột <span class="b">bình ${f}</span> của Phiếu số 3, ghi xong mới đo tiếp.`;
+  const T=[
+    ['Mở nút hai bình',`Hai bình tam giác đã dán nhãn bình 1, bình 2. Bấm vào <span class="b">nút cao su</span> của từng bình để mở nắp (đã mở ${s.open.filter(Boolean).length}/2 bình).`],
+    ['Cho hạt nảy mầm vào bình',`Kéo <span class="b">nhíp gắp</span> tới <span class="b">đĩa hạt đậu xanh nảy mầm</span>: nhíp sẽ tự gắp từng hạt, lần lượt bỏ vào bình 1 và bình 2 để hai bình có cùng lượng hạt.`],
+    ['Lắp cảm biến vào bình 1','Kéo <span class="b">đầu dò cảm biến</span> tới miệng <span class="b">bình 1</span> để đo nồng độ CO₂, tương tự phương án 2 của Thí nghiệm 1.'],
+    ['Đo nồng độ CO₂ ở bình 1',measure,'Bắt đầu đo'],
+    ['Bật đèn chiếu bình 2','Bấm vào <span class="b">đèn</span> để bật đèn 100 W chiếu sáng <span class="b">bình 2</span>.'],
+    ['Chiếu sáng bình 2 trong 2 giờ','Để đèn chiếu sáng bình 2 trong 2 giờ. Thời gian được tua nhanh trong mô phỏng.','▶ Tua 2 giờ'],
+    ['Chuyển cảm biến sang bình 2','Kéo <span class="b">đầu dò</span> từ bình 1 sang miệng <span class="b">bình 2</span> để đo tương tự.'],
+    ['Đo nồng độ CO₂ ở bình 2',measure,'Bắt đầu đo'],
+    ['Hoàn thiện Phiếu số 3','Đã đo xong hai bình. Mở phiếu để kiểm tra số liệu, cho biết nồng độ CO₂ tăng hay giảm ở mỗi bình, viết kết luận rồi nộp phiếu để sang thí nghiệm 2b.','Mở Phiếu số 3']
+  ][s.i];
+  const reading=s.i===5?`<div class="panel-t" id="tn2aReading">${fmtHours(s.hours)} / 2 giờ</div>`
+    :(s.i===3||s.i===7)?`<div class="panel-t" id="tn2aReading">${s.minutes.toFixed(1)} / 5 phút</div><div class="panel-x">${s.awaiting?(written?`Đã ghi phút ${minute} của bình ${f} vào phiếu. Bấm <span class="b">Đo phút tiếp theo</span>.`:`Hết phút ${minute}: đọc số trên màn hình máy đo, bấm <span class="b">Điền phiếu</span> để ghi vào phiếu rồi mới đo tiếp.`):`Bình ${f}: đã đo ${s.records[s.flask]}/5 phút`}</div>`:'';
+  setPanel(head+`
+    <div class="trow"><span class="panel-k">BƯỚC ${[1,1,2,2,3,3,3,3,3][s.i]} / 3</span><button class="back" id="tn2aReset" title="Làm lại thí nghiệm 2a" aria-label="Làm lại thí nghiệm 2a">${ICON.reset}</button></div>
+    <div class="panel-t"><div class="ttl">${T[0]}</div><div class="gd">${T[1]}</div></div>
+    ${s.act?`<div class="panel-x"><div class="hrow"><span class="hint">${HOW[s.how]}</span><button type="button" class="quick-act" id="tn2aQuick" title="Làm nhanh thao tác này">⚡ Làm nhanh</button></div></div>`:''}
+    ${reading}
+    <div class="note">Số liệu minh họa. Mốc tham chiếu trong bài: CO₂ không khí 0,04% (400 ppm).</div>`);
+  bindExpTabs();
+  $('tn2aReset').onclick=()=>{ if(confirm('Làm lại thí nghiệm 2a? Số liệu đã ghi trong phiếu vẫn được giữ.')) m.tn2a.restart(); };
+  if($('tn2aQuick')) $('tn2aQuick').onclick=()=>m.tn2a.quick();
+  let acts=[];
+  if(s.i===5) acts=[{label:s.playing?'⏸ Tạm dừng':s.hours?'▶ Tua tiếp':T[2],onClick:()=>m.tn2a.play(!s.playing)}];
+  else if(s.i===3||s.i===7){
+    // hết một phút: chỉ còn nút Điền phiếu (nổi bật); ghi xong số của phút đó mới hiện nút đo tiếp — máy không điền hộ
+    const fill=primary=>({alt:!primary,label:`${ICON.doc} Điền phiếu`,onClick:()=>{ m.tn2a.play(false); openP3a(f,s.awaiting?minute:0); }});
+    if(s.awaiting&&!written) acts=[fill(true)];
+    else if(s.awaiting) acts=[fill(false),{label:minute<5?'▶ Đo phút tiếp theo':`Hoàn tất đo bình ${f}`,onClick:()=>{
+      if(m.tn2a.record()&&minute<5) m.tn2a.play(true); renderTN2A();
+    }}];
+    else acts=[fill(false),{label:s.playing?'⏸ Tạm dừng đo':s.minutes?'▶ Đo phút tiếp theo':T[2],onClick:()=>m.tn2a.play(!s.playing)}];
+  }else if(s.i===8) acts=[{label:`${ICON.doc} ${T[2]}`,onClick:()=>openP3a()}];
+  setActions(acts);
+  const c=$('clock'); c.classList.toggle('show',[3,5,7].includes(s.i)); c.textContent=[3,5,7].includes(s.i)?clockText():'';
+  // đo xong hai bình thì phiếu số 3 tự bật lên một lần
+  const md=$('p1Modal'); if(s.i!==8) delete md.dataset.p3aauto; else if(!md.dataset.p3aauto){ md.dataset.p3aauto='1'; openP3a(); }
+  closeTipSilently();
+}
+
 /* Phương án 2: chuẩn bị mẫu, ủ, lắp cảm biến và ghi từng phút đo. */
 function renderPA2(){
   const m=model();
@@ -764,11 +851,15 @@ function renderPA2(){
 function renderStep1(){
   $('p1Modal').hidden=true;
   if(ex!==1&&model()?.pa2) model().pa2.exit();
+  if(ex!==2&&model()?.tn2a) model().tn2a.exit();
+  if(ex!==3&&model()?.tn2b) model().tn2b.exit();
   if(ex===0){ renderPA1(); return; }
   if(model()&&model().pa1) model().pa1.exit();
   updateClock();
   if(ex===1){ renderPA2(); return; }
-  const E=EXPS[ex],n=E.steps.length,s=E.steps[si],it=eqOf(s.focus);
+  if(ex===2){ renderTN2A(); return; }
+  const bench=ex===3&&!!model()?.tn2b?.enter();   // 2b: bàn riêng chỉ có dụng cụ cần dùng, nhìn toàn bàn (không cận cảnh theo dụng cụ)
+  const E=EXPS[ex],n=E.steps.length,s=E.steps[si],it=bench?null:eqOf(s.focus);
   const grpBtns=['Thí nghiệm 1','Thí nghiệm 2'].map((t,g)=>`<button type="button" data-g="${g}" aria-pressed="${E.grp===g}">${t}</button>`).join('');
   const subBtns=EXPS.map((x,i)=>x.grp===E.grp?`<button type="button" data-x="${i}" aria-pressed="${i===ex}">${x.label}</button>`:'').join('');
   setPanel(`<div class="xseg" role="group" aria-label="Chọn thí nghiệm">${grpBtns}</div>
@@ -786,7 +877,7 @@ function renderStep1(){
   else acts.push({label:`Sang phiếu thực hành ${ICON.next}`,onClick:()=>go(2)});
   setActions(acts);
   closeTipSilently();
-  if(model()) model().setFocus(s.focus); else layoutPins();
+  if(model()) model().setFocus(bench?0:s.focus); else layoutPins();
   speak();
 }
 function closeTipSilently(){ pinOn=0; partCard.classList.remove('show'); }
@@ -797,14 +888,36 @@ let store; try{ store=JSON.parse(localStorage.getItem(STORE_KEY)||'{}'); }catch(
 function saveStore(){ try{ localStorage.setItem(STORE_KEY,JSON.stringify(store)); }catch(e){} }
 function setVal(k,v){ store[k]=v; saveStore(); const m=$('shMsg'); if(m){ m.textContent='Đã lưu tự động · '+new Date().toLocaleTimeString('vi-VN'); m.dataset.s='1'; } }
 const getVal=(k,d='')=>store[k]!==undefined?store[k]:d;
+Object.keys(store).forEach(k=>{ if(/^p3[abc]-b\d$/.test(k)&&/^-?\d$/.test(String(store[k]))) delete store[k]; });   // giá trị của nút chọn cũ (số) không còn dùng
 let p2rows=getVal('p2-rows',null)||[1,2,3,4,5];
-const TREND=[{v:-2,t:'▼▼ Giảm mạnh'},{v:-1,t:'▼ Giảm nhẹ'},{v:0,t:'— Không đổi'},{v:1,t:'▲ Tăng nhẹ'},{v:2,t:'▲▲ Tăng mạnh'}];
 const ta=(key,ph,cls='',label='')=>`<textarea class="${cls}" data-key="${key}" placeholder="${ph}"${label?` aria-label="${label}"`:''}></textarea>`;
-const trend=(key,label)=>`<div class="trend" role="radiogroup" aria-label="${label}" data-key="${key}">${TREND.map(o=>`<button type="button" role="radio" data-v="${o.v}" aria-pressed="false">${o.t}</button>`).join('')}</div>`;
+// phiếu số 3 (SGK): học sinh tự viết nồng độ CO₂ tăng hay giảm (không chọn sẵn)
+const trend=(key,label)=>`<textarea class="short trend" data-key="${key}" placeholder="Tăng hay giảm?" aria-label="${label}"></textarea>`;
+/* bảng Phiếu số 3 theo mẫu SGK: Điều kiện khảo sát · Nồng độ CO₂ (tăng hay giảm) · Đồ thị minh hoạ.
+   Ô đồ thị: em ghi số đọc 5 phút của bình đó, đồ thị nhỏ tự vẽ theo số đã ghi. */
 function trendTable(id,rows){
-  return `<table class="sheet-table stack"><thead><tr><th scope="col">Điều kiện khảo sát</th><th scope="col">Nồng độ CO₂ (tăng hay giảm)</th></tr></thead><tbody>
-    ${rows.map((r,i)=>`<tr><th scope="row">${r[0]}<small>${r[1]}</small></th><td>${trend(`p3${id}-b${i+1}`,`${r[0]} — nồng độ CO₂`)}</td></tr>`).join('')}
+  return `<table class="sheet-table stack p3"><thead><tr><th scope="col">Điều kiện khảo sát</th><th scope="col">Nồng độ CO₂ (tăng hay giảm)</th><th scope="col">Đồ thị minh hoạ</th></tr></thead><tbody>
+    ${rows.map((r,i)=>{ const k=`p3${id}-b${i+1}`; return `<tr><th scope="row">${r[0]}<small>${r[1]}</small></th><td data-l="Nồng độ CO₂ (tăng hay giảm)">${trend(k,`${r[0]} — nồng độ CO₂`)}</td>
+      <td data-l="Đồ thị minh hoạ"><div class="mini"><canvas data-chart="${k}" aria-label="${r[0]} — đồ thị nồng độ CO₂ theo phút"></canvas>
+      <div class="mini-in">${[1,2,3,4,5].map(m=>`<label><span>Phút ${m}</span><input type="number" inputmode="numeric" placeholder="ppm" data-key="${k}-min-${m}" aria-label="${r[0]} — nồng độ CO₂ phút thứ ${m} (ppm)"></label>`).join('')}</div></div></td></tr>`; }).join('')}
   </tbody></table>`;
+}
+/* đồ thị nhỏ trong ô "Đồ thị minh hoạ": nồng độ CO₂ (ppm) theo phút 1–5 từ số em đã ghi */
+function drawMinis(){ document.querySelectorAll('canvas[data-chart]').forEach(drawMini); }
+function drawMini(cv){
+  const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth||220,H=cv.clientHeight||96;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const vals=[1,2,3,4,5].map(m=>{ const v=getVal(`${cv.dataset.chart}-min-${m}`,''); return v===''?null:Number(v); }),nums=vals.filter(v=>v!==null);
+  const L=40,R=8,T=8,B=18; ctx.font='10px Roboto,Arial'; ctx.fillStyle='#4A6461'; ctx.strokeStyle='#DCE6E4'; ctx.lineWidth=1;
+  const lo0=nums.length?Math.min(...nums):0,hi0=nums.length?Math.max(...nums):1,pad=(hi0-lo0)*.15||50,lo=lo0-pad,hi=hi0+pad;
+  const x=i=>L+i/4*(W-L-R),y=v=>T+(1-(v-lo)/(hi-lo||1))*(H-T-B);
+  for(let i=0;i<=2;i++){ const yy=T+i*(H-T-B)/2; ctx.beginPath(); ctx.moveTo(L,yy); ctx.lineTo(W-R,yy); ctx.stroke(); if(nums.length){ ctx.textAlign='right'; ctx.fillText(Math.round(hi-(hi-lo)*i/2),L-4,yy+3); } }
+  ctx.textAlign='center'; [1,2,3,4,5].forEach((m,i)=>ctx.fillText(m,x(i),H-5));
+  if(!nums.length){ ctx.fillText('Ghi số đọc để vẽ đồ thị',(L+W-R)/2,(T+H-B)/2+3); return; }
+  ctx.strokeStyle='#0E5A55'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.beginPath(); let on=false;
+  vals.forEach((v,i)=>{ if(v===null) return; on?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); on=true; }); ctx.stroke();
+  vals.forEach((v,i)=>{ if(v===null) return; ctx.beginPath(); ctx.arc(x(i),y(v),3.2,0,7); ctx.fillStyle='#C8F04A'; ctx.fill(); ctx.strokeStyle='#0E5A55'; ctx.lineWidth=1.5; ctx.stroke(); });
 }
 function p2TableHTML(){
   return `<table class="sheet-table"><thead><tr><th scope="col">Phút thứ</th><th scope="col">Nồng độ khí CO₂ (ppm)</th></tr></thead><tbody>
@@ -853,6 +966,7 @@ function renderSheet(target){
       <span class="sec-k">Phiếu số 3</span>
       <h3>Ánh sáng, độ ẩm, nồng độ khí CO₂ ảnh hưởng đến hô hấp của hạt</h3>
       <h4>a. Ánh sáng</h4>
+      ${getVal('p3a-submitted')?`<p class="sec-ok">✓ Đã nộp lúc ${getVal('p3a-submitted')} (từ thí nghiệm 2a)</p>`:''}
       ${trendTable('a',[['Bình 1','Không chiếu đèn'],['Bình 2','Chiếu đèn 100 W trong 2 giờ']])}
       <label class="fld">Kết luận${ta('p3a-kl','Ánh sáng ảnh hưởng… đến hô hấp của hạt','short')}</label>
       <h4>b. Độ ẩm</h4>
@@ -868,11 +982,6 @@ function renderSheet(target){
   </section></div>`;
 
   wireFields(sheet);
-  sheet.querySelectorAll('.trend').forEach(g=>{
-    const key=g.dataset.key,mark=()=>g.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(String(getVal(key,''))===b.dataset.v)));
-    mark();
-    g.querySelectorAll('button').forEach(b=>b.onclick=()=>{ setVal(key,b.dataset.v); mark(); });
-  });
   $('p2add').onclick=()=>{
     p2rows=[...p2rows,(p2rows[p2rows.length-1]||0)+1]; setVal('p2-rows',p2rows);
     $('p2wrap').innerHTML=p2TableHTML(); wireFields($('p2wrap')); drawChart();
@@ -885,14 +994,14 @@ function renderSheet(target){
     if(!confirm('Xoá toàn bộ nội dung đã điền trong phiếu thực hành?')) return;
     store={}; saveStore(); p2rows=[1,2,3,4,5]; renderSheet();
   };
-  drawChart();
+  drawChart(); drawMinis();
   sheet.scrollTop=0;
   if(target) requestAnimationFrame(()=>$(target).scrollIntoView({block:'start'}));
 }
 function wireFields(root){
   root.querySelectorAll('[data-key]:is(input,textarea)').forEach(el=>{
     const k=el.dataset.key; el.value=getVal(k,'');
-    el.addEventListener('input',()=>{ setVal(k,el.value); if(k.startsWith('p2-min-')) drawChart(); });
+    el.addEventListener('input',()=>{ setVal(k,el.value); if(k.startsWith('p2-min-')) drawChart(); if(/^p3[abc]-b\d-min-/.test(k)) drawMinis(); });
   });
 }
 function drawChart(){ ['p2chart','p2mChart'].forEach(id=>drawChartOn($(id))); }   // đồ thị ở Mục 3 và ở phiếu bật lên trên bàn
@@ -913,12 +1022,14 @@ function drawChartOn(cv){
   let started=false; vals.forEach((v,i)=>{ if(v===null) return; started?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); started=true; }); ctx.stroke();
   vals.forEach((v,i)=>{ if(v===null) return; ctx.beginPath(); ctx.arc(x(i),y(v),4.5,0,7); ctx.fillStyle='#C8F04A'; ctx.fill(); ctx.strokeStyle='#0E5A55'; ctx.lineWidth=2; ctx.stroke(); });
 }
-window.addEventListener('resize',()=>{ if(step===2) drawChart(); });
+window.addEventListener('resize',()=>{ if(step===2){ drawChart(); drawMinis(); } });
 
 /* ---------------- chuyển bước ---------------- */
 const stepBtns=[...stepsEl.querySelectorAll('.step')];
 function go(n,target){
   if(n!==1&&model()?.pa2) model().pa2.exit();
+  if(n!==1&&model()?.tn2a) model().tn2a.exit();
+  if(n!==1&&model()?.tn2b) model().tn2b.exit();
   step=n; stage.dataset.step=String(n);
   stepBtns.forEach((b,i)=>{ b.setAttribute('aria-pressed',String(i===n)); if(i===n) b.setAttribute('aria-current','step'); else b.removeAttribute('aria-current'); if(i<n) b.classList.add('done'); });
   stepsEl.classList.remove('open');
@@ -954,6 +1065,12 @@ function attachModel(){
   model().onDraw=c=>{ cam=c; layoutPins(); };
   model().onFocusChange=f=>{ if(f===0&&pinOn) closeTip(); };
   if(model().pa1) model().pa1.onChange=onPA1Change;
+  if(model().tn2a) model().tn2a.onChange=msg=>{
+    if(step!==1||ex!==2) return;
+    if(msg&&msg.ok) toast('✓ '+msg.ok);
+    if(msg&&msg.warn) toast(msg.warn,true);
+    renderTN2A();
+  };
   if(model().pa2) model().pa2.onChange=msg=>{
     if(step!==1||ex!==1) return;
     if(msg&&msg.ok) toast('✓ '+msg.ok);
@@ -1580,7 +1697,7 @@ function pa1Hover(g,brief){
   if(pa1.hover!==g){ pa1.hover=g; dirty=true; }
   if(brief&&g) hoverTimer=setTimeout(()=>{ pa1.hover=null; dirty=true; },2200);
 }
-canvas.addEventListener('pointerleave',()=>{ if(pa1.active) pa1Hover(null); if(pa2.active) pa2Hover(null); });
+canvas.addEventListener('pointerleave',()=>{ if(pa1.active) pa1Hover(null); if(pa2.active) pa2Hover(null); if(tn2a.active) tn2aHover(null); if(tn2b.active) tn2bHover(null); });
 function pa1Phys(dt){ if(!lab) return false; const a=stepSpoonPour(dt),b=stepSeeds(dt),c=stepPouches(dt),d=stepStoppers(dt); return a||b||c||d; }
 
 /* thực hiện thao tác hiện tại (học sinh làm đúng, hoặc bấm "Làm nhanh") */
@@ -1628,7 +1745,7 @@ function pa1Hint(){
 function pa1Enter(){
   if(pa1.active) return true;
   if(!buildLab()) return false;
-  pa1.active=true; pa1Apply(); focus=0; if(under) setUnder(false); yaw=0; pitch=.62; distance=16.5; tween=true; dirty=true; return true;
+  tn2aExit(); tn2bExit(); pa1.active=true; pa1Apply(); focus=0; if(under) setUnder(false); yaw=0; pitch=.62; distance=16.5; tween=true; dirty=true; return true;
 }
 function pa1Exit(){
   if(!pa1.active) return; pa1.active=false; pa1.playing=false;
@@ -1661,6 +1778,40 @@ let lab2=null;
 const pa2PPM=()=>Math.round(400+384*pa2.minutes); // chuỗi minh hoạ; 2320 ppm ở phút 5
 function pa2State(){ return {...pa2,onChange:undefined,hover:undefined,sown:pa2.sown.slice(),busy:pa2Busy,drag:!!PA2_DRAG[pa2.i],ppm:pa2PPM(),records:pa2.records.map(r=>({...r}))}; }
 function pa2Emit(msg){ dirty=true; pa2.onChange?.(msg||null); }
+/* ---------------- bộ cảm biến CO₂ dùng chung cho các bàn riêng (phương án 2, thí nghiệm 2a) ----------------
+   máy đo (màn hình vẽ bằng canvas) · đầu dò · dây; khi đầu dò rời chỗ, dây nối đầu dò được vẽ lại thành ống mềm (sensorLead) */
+function makeSensor(root,pos){
+  const sensor=new THREE.Group();sensor.position.set(...pos);root.add(sensor);
+  const [meter,probe,wire]=CO2_PARTS.map(url=>rawGLB[url].clone(true));sensor.add(meter,probe,wire);
+  const display=document.createElement('canvas');display.width=512;display.height=320;
+  const texture=new THREE.CanvasTexture(display);texture.colorSpace=THREE.SRGBColorSpace;texture.flipY=false;   // UV của GLB theo quy ước flipY=false; để mặc định thì chữ trên màn hình bị lật ngược
+  meter.traverse(o=>{if(o.isMesh&&o.name==='LCD')o.material=new THREE.MeshBasicMaterial({map:texture});});
+  // Dùng nguyên model dây; chỉ thay đoạn nối đầu dò khi đầu dò rời chỗ.
+  let lead=null;
+  wire.traverse(o=>{if(o.isMesh&&o.name==='Day_noi_dau_do'||o.isMesh&&o.name==='Day noi dau do'){
+    o.geometry=o.geometry.clone();lead={mesh:o,original:o.geometry.attributes.position.array.slice()};
+  }});
+  // Dây đầu dò khi đầu dò rời chỗ: vẽ lại bằng ống mềm võng tự nhiên (giữ nguyên đầu nối ở cuộn dây), thay cho kéo giãn lưới dây gốc
+  let cable=null;
+  if(lead){
+    const o=lead.original,start=new THREE.Vector3();let n=0;
+    for(let i=0;i<o.length;i+=3)if(o[i]<-1.16){start.x+=o[i];start.y+=o[i+1];start.z+=o[i+2];n++;}
+    start.divideScalar(Math.max(1,n));
+    let yMin=Infinity,yMax=-Infinity;for(let i=0;i<o.length;i+=3)if(o[i]>-.6&&o[i]<0){yMin=Math.min(yMin,o[i+1]);yMax=Math.max(yMax,o[i+1]);}
+    cable={start,radius:Math.max(.008,Math.min(.03,(yMax-yMin)/2)),mesh:new THREE.Mesh(new THREE.BufferGeometry(),lead.mesh.material)};
+    cable.mesh.castShadow=true;cable.mesh.visible=false;lead.mesh.parent.add(cable.mesh);
+  }
+  return {sensor,meter,probe,wire,lead,cable,display,texture,probeHome:probe.position.clone(),leadKey:''};
+}
+/* vị trí đầu dò (toạ độ của bộ cảm biến) khi lắp kín miệng bình tam giác flask */
+const sensorAttachAt=(S,flask)=>new THREE.Vector3(flask.position.x-S.sensor.position.x-.58,1.77,flask.position.z-S.sensor.position.z+.105);
+/* màn hình máy đo: số đọc to ở giữa, thời gian và trạng thái bên dưới */
+function sensorScreen(S,value,time,status){
+  const c=S.display.getContext('2d');c.fillStyle='#edf5e7';c.fillRect(0,0,512,320);
+  c.fillStyle='#153c37';c.textAlign='center';c.font='bold 30px Arial';c.fillText('CO₂ · MÔ PHỎNG',256,55);
+  c.font='bold 66px Arial';c.fillText(value,256,160);
+  c.font='28px Arial';c.fillText(time,256,225);c.fillText(status,256,275);S.texture.needsUpdate=true;
+}
 function buildLab2(){
   if(lab2) return true;
   const needed=[3,4,6,8,11,13];
@@ -1711,43 +1862,21 @@ function buildLab2(){
     const a=n*2.399963,r=.3*Math.sqrt(((n%24)+.5)/24),spr=oneSprout();spr.scale.setScalar(sproutK);
     spr.position.set(Math.cos(a)*r,.09+Math.floor(n/24)*.065*sproutK,Math.sin(a)*r);spr.rotation.set((Math.random()-.5)*.6,a,(Math.random()-.5)*.6);pile.add(spr);
   }
-  const sensor=new THREE.Group();sensor.position.set(2,0,.65);root.add(sensor);
-  const [meter,probe,wire]=CO2_PARTS.map(url=>rawGLB[url].clone(true));sensor.add(meter,probe,wire);
-  const display=document.createElement('canvas');display.width=512;display.height=320;
-  const texture=new THREE.CanvasTexture(display);texture.colorSpace=THREE.SRGBColorSpace;texture.flipY=false;   // UV của GLB theo quy ước flipY=false; để mặc định thì chữ trên màn hình bị lật ngược
-  meter.traverse(o=>{if(o.isMesh&&o.name==='LCD')o.material=new THREE.MeshBasicMaterial({map:texture});});
-  // Dùng nguyên model dây; chỉ uốn đoạn nối đầu dò khi lắp đầu dò lên cổ bình.
-  let lead=null;
-  wire.traverse(o=>{if(o.isMesh&&o.name==='Day_noi_dau_do'||o.isMesh&&o.name==='Day noi dau do'){
-    o.geometry=o.geometry.clone();lead={mesh:o,original:o.geometry.attributes.position.array.slice()};
-  }});
-  const probeHome=probe.position.clone();
-  const attachedPosition=new THREE.Vector3(flask.position.x-sensor.position.x-.58,1.77,flask.position.z-sensor.position.z+.105);
+  const S=makeSensor(root,[2,0,.65]),{sensor,probe,wire,lead,display,texture,probeHome}=S;
+  const attachedPosition=sensorAttachAt(S,flask);
   // đầu vòi chai nước (toạ độ cục bộ của chai): điểm xa nhất về phía vòi cong ở phần trên chai — giọt nước hình thành tại đây
   const nozzle=new THREE.Vector3(Infinity,0,0);water.updateMatrixWorld(true);
   {const top=new THREE.Box3().setFromObject(water).max.y-.25,v=new THREE.Vector3();
    water.traverse(o=>{if(!o.isMesh)return;const a=o.geometry.attributes.position;for(let i=0;i<a.count;i++){v.fromBufferAttribute(a,i).applyMatrix4(o.matrixWorld);if(v.y>top&&v.x<nozzle.x)nozzle.copy(v);}});
    nozzle.sub(water.position);}
-  // Dây đầu dò khi đầu dò rời chỗ: vẽ lại bằng ống mềm võng tự nhiên (giữ nguyên đầu nối ở cuộn dây), thay cho kéo giãn lưới dây gốc
-  let cable=null;
-  if(lead){
-    const o=lead.original,start=new THREE.Vector3();let n=0;
-    for(let i=0;i<o.length;i+=3)if(o[i]<-1.16){start.x+=o[i];start.y+=o[i+1];start.z+=o[i+2];n++;}
-    start.divideScalar(Math.max(1,n));
-    let yMin=Infinity,yMax=-Infinity;for(let i=0;i<o.length;i+=3)if(o[i]>-.6&&o[i]<0){yMin=Math.min(yMin,o[i+1]);yMax=Math.max(yMax,o[i+1]);}
-    cable={start,radius:Math.max(.008,Math.min(.03,(yMax-yMin)/2)),mesh:new THREE.Mesh(new THREE.BufferGeometry(),lead.mesh.material)};
-    cable.mesh.castShadow=true;cable.mesh.visible=false;lead.mesh.parent.add(cable.mesh);
-  }
+  const cable=S.cable;
   const homes=new Map([[paper,paper.position.clone()],[stock,stock.position.clone()],[water,water.position.clone()],[dishes[1],dishes[1].position.clone()],[probe,probeHome]]);
   const rings=[0,1].map(()=>{const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide}));r.rotation.x=-Math.PI/2;r.position.y=.008;r.visible=false;r.renderOrder=2;root.add(r);return r;});
   lab2={root,dishes,petris,seedCount,paper,stock,water,nozzle,beaker,flask,corks,sprouts,pile,sensor,probe,probeHome,wire,lead,attachedPosition,display,texture,homes,rings,cable,drip:null,leadKey:''};
   root.visible=false;return true;
 }
 function pa2Screen(){
-  if(!lab2)return;const c=lab2.display.getContext('2d');c.fillStyle='#edf5e7';c.fillRect(0,0,512,320);
-  c.fillStyle='#153c37';c.textAlign='center';c.font='bold 30px Arial';c.fillText('CO₂ · MÔ PHỎNG',256,55);
-  c.font='bold 66px Arial';c.fillText(`${pa2PPM()} ppm`,256,160);
-  c.font='28px Arial';c.fillText(`${pa2.minutes.toFixed(1)} / 5 phút`,256,225);c.fillText(pa2.awaiting?'GHI KẾT QUẢ':pa2.playing?'ĐANG ĐO':'SẴN SÀNG',256,275);lab2.texture.needsUpdate=true;
+  if(lab2)sensorScreen(lab2,`${pa2PPM()} ppm`,`${pa2.minutes.toFixed(1)} / 5 phút`,pa2.awaiting?'GHI KẾT QUẢ':pa2.playing?'ĐANG ĐO':'SẴN SÀNG');
 }
 /* đưa các vật về chỗ theo bước hiện tại (không đụng tới vật đang kéo / đang chạy hoạt cảnh) */
 function pa2Place(){
@@ -1758,8 +1887,9 @@ function pa2Place(){
 }
 /* dây nối đầu dò: đầu dò ở chỗ cũ → dùng lưới dây gốc; đầu dò đang kéo / đã lắp lên bình → ống mềm từ cuộn dây trên bàn,
    bò trên mặt bàn tới gần chân bình rồi võng lên, chui vào đuôi đầu dò theo hướng thân đầu dò */
-function pa2Lead(){
-  const L=lab2;if(!L?.lead||!L.cable)return;
+function pa2Lead(){ if(lab2)sensorLead(lab2,lab2.flask); }
+function sensorLead(L,flask){
+  if(!L?.lead||!L.cable)return;
   const p=L.probe,key=[...p.position.toArray(),p.rotation.x].map(v=>v.toFixed(4)).join();if(key===L.leadKey)return;L.leadKey=key;
   const moved=p.position.distanceToSquared(L.probeHome)>1e-6||Math.abs(p.rotation.x)>1e-4;
   L.lead.mesh.visible=!moved;L.cable.mesh.visible=moved;if(!moved){dirty=true;return;}
@@ -1767,7 +1897,7 @@ function pa2Lead(){
   const end=new V(.58,.105,.38).applyEuler(p.rotation).add(p.position).sub(L.probeHome);
   const out=new V(0,0,1).applyEuler(p.rotation),tail=end.clone().addScaledVector(out,.15);
   // dây không đi xuyên thân bình: chạm bàn ở phía máy đo, cách tâm bình hơn bán kính đáy bình
-  const fc=L.sensor.worldToLocal(L.flask.getWorldPosition(new V())),away=new V(S.x-fc.x,0,S.z-fc.z).normalize();
+  const fc=L.sensor.worldToLocal(flask.getWorldPosition(new V())),away=new V(S.x-fc.x,0,S.z-fc.z).normalize();
   const nearFlask=Math.hypot(tail.x-fc.x,tail.z-fc.z)<.9;
   const land=nearFlask?fc.clone().addScaledVector(away,.85).setY(r):new V().lerpVectors(new V(tail.x,r,tail.z),new V(S.x,r,S.z),.3).setY(r);
   const pts=[end,tail];
@@ -1842,7 +1972,7 @@ function pa2Apply(){
 }
 function pa2Enter(){
   if(pa2.active)return true;if(!buildLab2())return false;
-  pa1Exit();pa2.active=true;document.getElementById('tags').classList.add('pa2-tags');draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;pa2Apply();return true;
+  pa1Exit();tn2aExit();tn2bExit();pa2.active=true;document.getElementById('tags').classList.add('pa2-tags');draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;pa2Apply();return true;
 }
 function pa2Exit(){
   if(!pa2.active)return;pa2.active=false;pa2.playing=false;pa2.hover=null;pa2Halt();lab2.root.visible=false;document.getElementById('tags').classList.remove('pa2-tags');
@@ -1966,6 +2096,289 @@ function pa2Tags(){
   const b=new THREE.Box3().setFromObject(h===L.sensor?L.sensor.children[0]:h),c=b.getCenter(new THREE.Vector3());   // bộ cảm biến: đặt nhãn trên máy đo, không theo đầu dò đã lắp lên bình
   return text?[{text,p:[c.x,b.max.y+.08,c.z]}]:[];
 }
+/* =====================================================================
+   THÍ NGHIỆM 2a · ÁNH SÁNG — bàn riêng, chỉ đặt các dụng cụ cần dùng (lấy từ bàn Chuẩn bị):
+   2 bình tam giác có nút (bình 1, bình 2) · đèn chiếu vào bình 2 · đĩa hạt đậu xanh nảy mầm · bộ cảm biến CO₂
+   Tiến trình (tn2a.i): 0 mở nút hai bình · 1 cho hạt nảy mầm vào hai bình · 2 lắp đầu dò vào bình 1 · 3 đo bình 1 (5 phút)
+   · 4 bật đèn chiếu bình 2 · 5 tua 2 giờ · 6 chuyển đầu dò sang bình 2 · 7 đo bình 2 (5 phút) · 8 hoàn thiện phiếu số 3
+   ===================================================================== */
+const tn2a={active:false,hover:null,i:0,open:[false,false],seeded:[false,false],count:[0,0],lamp:false,hours:0,minutes:0,playing:false,awaiting:false,records:[[],[]],onChange:null};
+const TN2A_RATE=[384,470];   // ppm tăng mỗi phút (minh hoạ): bình 2 dưới đèn 100 W ấm lên nên hạt hô hấp mạnh hơn
+const TN2A_DRAG={1:'tweezers',2:'probe',6:'probe'},TN2A_CLICK={0:'cork',4:'lamp'};
+let lab3=null,tn2aBusy=false,tn2aDrag=null;
+const TN2A_TRIPS=4;   // số lần nhíp gắp cho MỖI bình (gắp xen kẽ bình 1, bình 2 → hai bình cùng lượng hạt)
+const LAMP_REACH=1.16;   // chao đèn lệch khỏi tâm đế bấy nhiêu theo phương ngang (đo trên model đèn)
+const LAMP_SIDE=.42;     // chao đèn đặt lệch sang phải trục bình 2 bấy nhiêu: đầu dò lắp trên miệng bình chiếm ±0,2 → chao không đè lên đầu dò
+const tn2aCur=()=>tn2a.i<=3?0:1;   // bình đang đo
+const tn2aPPM=()=>Math.round(400+TN2A_RATE[tn2aCur()]*tn2a.minutes);
+function tn2aEmit(msg){dirty=true;tn2a.onChange?.(msg||null);}
+function tn2aState(){return {i:tn2a.i,open:tn2a.open.slice(),seeded:tn2a.seeded.slice(),lamp:tn2a.lamp,hours:tn2a.hours,minutes:tn2a.minutes,playing:tn2a.playing,awaiting:tn2a.awaiting,records:tn2a.records.map(r=>r.length),flask:tn2aCur(),busy:tn2aBusy,act:!!(TN2A_DRAG[tn2a.i]||TN2A_CLICK[tn2a.i]),how:TN2A_DRAG[tn2a.i]?'drag':TN2A_CLICK[tn2a.i]?'click':''};}
+function buildLab3(){
+  if(lab3)return true;
+  if([1,3,12].some(n=>!rawGLB[SPEC[n].url])||CO2_PARTS.some(url=>!rawGLB[url])||!tweezersModel)return false;
+  const root=new THREE.Group();scene.add(root);
+  const tool=(n,pos,opt={})=>{const g=wrap(rawGLB[SPEC[n].url].clone(true),{...SPEC[n],...opt});g.position.set(...pos);root.add(g);shadowsFor(g);return g;};
+  const flasks=[[-1.4,0,-.5],[.9,0,-.5]].map(p=>{const f=tool(3,p,{center:true});f.traverse(o=>{if(o.isMesh&&o.material===glass)o.material=glassThin;});return f;});
+  // nút cao su nằm chung khối với bình → gom các mặt "Cork" thành một vật riêng để nhấc ra đặt xuống bàn
+  const corks=flasks.map((f,k)=>{
+    const st=new THREE.Group();f.add(st);f.updateMatrixWorld(true);const list=[];
+    f.traverse(o=>{if(o.isMesh&&/cork|nut cao su/i.test(o.material?.name||o.name||''))list.push(o);});list.forEach(m=>st.attach(m));
+    const h=new THREE.Box3().setFromObject(st).min.y;
+    st.userData={closed:st.position.clone(),aside:st.position.clone().add(new THREE.Vector3(k?-.55:.55,-h,.55))};   // đặt nằm trên bàn, phía trước bình
+    return st;
+  });
+  // hạt nảy mầm trong mỗi bình (hiện khi đã cho hạt vào), cùng cỡ mầm thu nhỏ như phương án 2
+  const piles=flasks.map(f=>{
+    const g=new THREE.Group();g.visible=false;f.add(g);
+    for(let n=0;n<40;n++){const a=n*2.399963,r=.3*Math.sqrt(((n%20)+.5)/20),spr=oneSprout();spr.scale.setScalar(.55);
+      spr.position.set(Math.cos(a)*r,.09+Math.floor(n/20)*.036,Math.sin(a)*r);spr.rotation.set((Math.random()-.5)*.6,a,(Math.random()-.5)*.6);g.add(spr);}
+    return g;
+  });
+  // đèn đặt bên phải bình 2, quay chao về phía bình (rotY 0: chao lệch về −x), chao ngay trên miệng bình 2
+  const lamp=tool(1,[flasks[1].position.x+LAMP_REACH+LAMP_SIDE,0,flasks[1].position.z],{rotY:0});
+  lamp.updateMatrixWorld(true);   // vị trí chao đèn đo theo toạ độ thế giới: cập nhật ma trận ngay sau khi đặt đèn
+  let cover=null;lamp.traverse(o=>{if(o.isMesh&&o.name==='Lamp_Cover'){o.material=o.material.clone();cover=o;}});
+  const cb=cover?new THREE.Box3().setFromObject(cover):new THREE.Box3(new THREE.Vector3(.8,1.7,-.5),new THREE.Vector3(1,1.8,-.5));
+  const lampAt=cb.getCenter(new THREE.Vector3());lampAt.y=cb.min.y;
+  const spot=new THREE.SpotLight(0xffe2a8,0,5,.55,.6,1.2);spot.position.copy(lampAt);spot.target.position.set(flasks[1].position.x,.3,flasks[1].position.z);root.add(spot,spot.target);
+  // chùm sáng mờ chiếu chéo từ chao đèn xuống thân bình 2 (đỉnh nón ở chao, đáy nón quanh bình)
+  const beamTo=new THREE.Vector3(flasks[1].position.x,.35,flasks[1].position.z),beamDir=beamTo.clone().sub(lampAt),beamH=beamDir.length();
+  const beam=new THREE.Mesh(new THREE.ConeGeometry(.6,beamH,40,1,true),new THREE.MeshBasicMaterial({color:0xffe7b0,transparent:true,opacity:.13,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending}));
+  beam.quaternion.setFromUnitVectors(new THREE.Vector3(0,-1,0),beamDir.normalize());beam.position.copy(lampAt).lerp(beamTo,.5);beam.visible=false;root.add(beam);
+  const dish=tool(12,[-.25,0,1.3],{center:true});
+  // nhíp gắp hạt (cùng model với phương án 1 của thí nghiệm 1): nằm cạnh đĩa hạt, mũi hướng −Z
+  const tweezers=tweezersModel.clone(true);tweezers.position.set(.75,0,1.6);root.add(tweezers);shadowsFor(tweezers);
+  const grip=new THREE.Group();grip.position.set(0,.025,-TW_TIP+.005);tweezers.add(grip);   // giữa hai càng, sát mũi nhíp
+  const twSeed=oneSprout();twSeed.scale.setScalar(.85);twSeed.rotation.set(0,Math.PI/2,0);twSeed.visible=false;grip.add(twSeed);
+  const S=makeSensor(root,[-2.3,0,.9]);
+  const attach=flasks.map(f=>sensorAttachAt(S,f));
+  const rings=[0,1].map(()=>{const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide}));r.rotation.x=-Math.PI/2;r.position.y=.008;r.visible=false;r.renderOrder=2;root.add(r);return r;});
+  lab3={root,flasks,corks,piles,lamp,cover,spot,beam,dish,tweezers,grip,twSeed,twHome:tweezers.position.clone(),attach,rings,...S};
+  root.visible=false;return true;
+}
+/* đặt mọi thứ đúng theo bước (không đụng vật đang kéo / đang chạy hoạt cảnh) */
+function tn2aApply(){
+  const L=lab3;if(!L)return;
+  if(!tn2aBusy&&!tn2aDrag){
+    L.corks.forEach((c,k)=>c.position.copy(tn2a.open[k]?c.userData.aside:c.userData.closed));
+    L.tweezers.position.copy(L.twHome);L.tweezers.rotation.set(0,0,0);L.twSeed.visible=false;
+    const at=tn2a.i>=7?L.attach[1]:tn2a.i>=3?L.attach[0]:null;
+    L.probe.rotation.set(at?-Math.PI/2:0,0,0);L.probe.position.copy(at||L.probeHome);
+  }
+  // hạt trong bình hiện dần theo số lần nhíp đã bỏ hạt vào bình đó
+  L.piles.forEach((g,k)=>{g.visible=tn2a.count[k]>0;const n=Math.round(g.children.length*tn2a.count[k]/TN2A_TRIPS);g.children.forEach((c,j)=>c.visible=j<n);});
+  if(L.cover){L.cover.material.emissive?.setHex(tn2a.lamp?0xffd27a:0x000000);if(L.cover.material.emissiveIntensity!==undefined)L.cover.material.emissiveIntensity=tn2a.lamp?2.2:0;}
+  L.spot.intensity=tn2a.lamp?6:0;L.beam.visible=tn2a.lamp;
+  sensorLead(L,tn2aNearFlask());
+  const measuring=tn2a.i===3||tn2a.i===7;
+  sensorScreen(L,measuring?`${tn2aPPM()} ppm`:'— ppm',measuring?`${tn2a.minutes.toFixed(1)} / 5 phút · bình ${tn2aCur()+1}`:'',tn2a.awaiting?'GHI KẾT QUẢ':tn2a.playing&&measuring?'ĐANG ĐO':measuring?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
+  tn2aRings();dirty=true;
+}
+const tn2aNearFlask=()=>{const L=lab3,p=L.probe.getWorldPosition(new THREE.Vector3());return L.flasks.reduce((a,f)=>f.position.distanceTo(p)<a.position.distanceTo(p)?f:a);};
+const tn2aWorld=o=>o.getWorldPosition(new THREE.Vector3());
+function tn2aSrc(){const L=lab3,k=TN2A_DRAG[tn2a.i];return k==='tweezers'?L.tweezers:k==='probe'?L.probe:null;}
+/* đích của bước hiện tại; bước cho hạt: bình đã mở, chưa có hạt, gần vị trí p nhất */
+function tn2aTarget(p){
+  const L=lab3;
+  if(tn2a.i===1)return L.dish;   // đưa nhíp tới đĩa hạt; nhíp tự gắp bỏ vào hai bình
+  return tn2a.i===2?L.flasks[0]:tn2a.i===6?L.flasks[1]:null;
+}
+function tn2aRings(){
+  const L=lab3;if(!L)return;L.rings.forEach(r=>r.visible=false);
+  if(!tn2a.active||tn2aBusy)return;
+  const put=(r,o,sc)=>{const w=tn2aWorld(o);r.visible=true;r.position.set(w.x,.008,w.z);r.scale.setScalar(sc);r.userData.base=sc;};
+  if(tn2a.i===0){[0,1].forEach(k=>{if(!tn2a.open[k])put(L.rings[k],L.flasks[k],1);});return;}
+  if(tn2a.i===4){put(L.rings[0],L.lamp,.7);return;}
+  const src=tn2aSrc();if(!src)return;
+  if(!tn2aDrag)put(L.rings[0],src,src===L.probe?.5:.75);
+  const t=tn2aTarget();if(t)put(L.rings[1],t,1);
+}
+function tn2aHint(){
+  return ['Bấm vào nút cao su của từng bình để mở nắp.','Kéo nhíp gắp tới đĩa hạt đậu xanh nảy mầm rồi thả tay.','Kéo đầu dò cảm biến tới miệng bình 1.','','Bấm vào đèn để bật đèn chiếu sáng bình 2.','','Kéo đầu dò từ bình 1 sang miệng bình 2.'][tn2a.i]||'';
+}
+/* nhíp tự gắp: mũi nhíp chúc xuống lớp hạt trong đĩa kẹp một hạt → đưa tới trên miệng bình → nhả hạt rơi vào bình;
+   xen kẽ bình 1, bình 2 cho tới khi mỗi bình đủ TN2A_TRIPS lần, rồi đặt nhíp về chỗ */
+function tn2aTipAt(T,a){   // vị trí tâm nhíp để mũi nhíp (điểm kẹp) nằm đúng T khi nhíp nghiêng góc a quanh trục X
+  const g=lab3.grip.position,c=Math.cos(a),sn=Math.sin(a);
+  return [T.x,T.y-(g.y*c-g.z*sn),T.z-(g.y*sn+g.z*c)];
+}
+function tn2aGrab(){
+  const L=lab3,tw=L.tweezers,d=L.dish.position,dropped=tn2a.count.slice();tn2aBusy=true;L.rings.forEach(r=>r.visible=false);
+  const trip=()=>{
+    const k=dropped[0]<=dropped[1]?0:1;   // đếm lúc nhả hạt (hạt còn đang rơi thì tn2a.count chưa tăng)
+    if(dropped[k]>=TN2A_TRIPS){
+      animateTo(tw,L.twHome.toArray(),.5,()=>tn2aFinish('Nhíp đã gắp hạt nảy mầm vào hai bình, mỗi bình cùng lượng hạt.'),.2,0);return;
+    }
+    const pick=new THREE.Vector3(d.x+(Math.random()-.5)*.3,.3,d.z+(Math.random()-.5)*.3),f=L.flasks[k].position,mouth=new THREE.Vector3(f.x,1.85,f.z);
+    animateTo(tw,tn2aTipAt(pick,TW_DIP),.35,()=>{
+      L.twSeed.visible=true;dirty=true;   // kẹp một hạt
+      animateTo(tw,tn2aTipAt(mouth,0),.55,()=>{
+        // nhả hạt: hạt rơi qua cổ bình xuống lớp hạt dưới đáy
+        L.twSeed.visible=false;dropped[k]++;const seed=oneSprout();seed.userData.tn2aSeed=true;seed.scale.setScalar(.55);seed.position.copy(L.grip.getWorldPosition(new THREE.Vector3()));L.root.add(seed);
+        animateTo(seed,[f.x,.2,f.z],.35,()=>{L.root.remove(seed);tn2a.count[k]++;tn2a.seeded[k]=true;tn2aApply();tn2aEmit();});
+        trip();
+      },.45,0);
+    },.15,TW_DIP);
+  };
+  trip();
+}
+function tn2aFinish(msg){tn2aBusy=false;tn2a.i++;tween=true;tn2aApply();tn2aEmit({ok:msg});}
+/* thực hiện thao tác hiện tại (học sinh làm đúng, hoặc bấm "Làm nhanh") */
+function tn2aDo(k){
+  const L=lab3;if(!tn2a.active||!L||tn2aBusy)return;
+  if(tn2a.i===0){
+    k=k??tn2a.open.indexOf(false);if(k<0||tn2a.open[k])return;
+    tn2aBusy=true;L.rings.forEach(r=>r.visible=false);
+    animateTo(L.corks[k],L.corks[k].userData.aside.toArray(),.6,()=>{tn2a.open[k]=true;
+      if(tn2a.open.every(Boolean))tn2aFinish('Đã mở nút cao su của hai bình.');
+      else{tn2aBusy=false;tn2aApply();tn2aEmit({ok:`Đã mở nút bình ${k+1}. Tiếp tục với bình ${tn2a.open.indexOf(false)+1}.`});}},.5);
+  }
+  else if(tn2a.i===1)tn2aGrab();
+  else if(tn2a.i===2||tn2a.i===6){
+    const to=L.attach[tn2a.i===2?0:1];tn2aBusy=true;L.rings.forEach(r=>r.visible=false);
+    animateTo(L.probe,to.toArray(),.7,()=>tn2aFinish(tn2a.i===2?'Đã lắp đầu dò kín miệng bình 1, máy đo sẵn sàng.':'Đã chuyển đầu dò sang bình 2, máy đo sẵn sàng.'),.45,-Math.PI/2);
+  }
+  else if(tn2a.i===4){tn2a.lamp=true;tn2aFinish('Đã bật đèn 100 W chiếu sáng bình 2.');}
+  dirty=true;
+}
+/* bấm vào nút cao su / thân bình (bước mở nắp) hoặc vào đèn (bước bật đèn) */
+function tn2aClickAt(e){
+  const L=lab3;if(!tn2a.active||!L||tn2aBusy||anims.length)return false;
+  aim(e);
+  if(tn2a.i===0){const k=[0,1].find(k=>!tn2a.open[k]&&raycaster.intersectObject(L.flasks[k],true).length);if(k===undefined)return false;tn2aDo(k);return true;}
+  if(tn2a.i===4&&raycaster.ray.intersectsBox(new THREE.Box3().setFromObject(L.lamp))){tn2aDo();return true;}   // tay đèn mảnh: bấm trong cả khối đèn là được
+  return false;
+}
+function tn2aHit(e){
+  const o=tn2aSrc();if(!tn2a.active||!o||tn2aBusy||anims.length)return null;
+  aim(e);
+  if(o===lab3.tweezers)return raycaster.ray.intersectsBox(new THREE.Box3().setFromObject(o).expandByScalar(.08))?o:null;   // nhíp mảnh: bấm quanh nhíp là cầm được
+  return raycaster.intersectObject(o,true).length?o:null;
+}
+function tn2aDown(e){
+  const o=tn2aHit(e),p=o&&floorPoint(e);if(!p)return false;
+  const w=tn2aWorld(o),base=o===lab3.probe?lab3.probe.position.y:0;
+  tn2aDrag={o,y:o===lab3.probe?Math.max(base,.45):.3,dx:w.x-p.x,dz:w.z-p.z,x0:e.clientX,y0:e.clientY,moved:0};
+  if(o===lab3.probe&&tn2a.i===6)lab3.probe.rotation.x=0;   // nhấc đầu dò khỏi bình 1
+  tn2aRings();canvas.style.cursor='grabbing';return true;
+}
+function tn2aMove(e){
+  if(!tn2aDrag)return false;const D=tn2aDrag,p=floorPoint(e);if(!p)return true;
+  const x=Math.max(TABLE_EDGE.x0+.2,Math.min(TABLE_EDGE.x1-.2,p.x+D.dx)),z=Math.max(TABLE_EDGE.z0+.2,Math.min(TABLE_EDGE.z1-.2,p.z+D.dz));
+  const local=D.o.parent.worldToLocal(new THREE.Vector3(x,0,z));D.o.position.set(local.x,D.y,local.z);
+  D.moved=Math.max(D.moved,Math.hypot(e.clientX-D.x0,e.clientY-D.y0));
+  if(D.o===lab3.probe)sensorLead(lab3,tn2aNearFlask());dirty=true;return true;
+}
+function tn2aUp(){
+  if(!tn2aDrag)return false;const {o,moved}=tn2aDrag;tn2aDrag=null;
+  const w=tn2aWorld(o),t=tn2aTarget(w),near=t&&Math.hypot(w.x-t.position.x,w.z-t.position.z)<.7;
+  if(moved>=5&&near){tn2aDo(lab3.flasks.indexOf(t));return true;}
+  // thả sai chỗ: vật về chỗ cũ (đầu dò ở bước 6 về lại miệng bình 1)
+  const L=lab3,back=o===L.tweezers?L.twHome:tn2a.i===6?L.attach[0]:L.probeHome;
+  tn2aBusy=true;animateTo(o,back.toArray(),.4,()=>{tn2aBusy=false;tn2aApply();},0,o===L.probe&&tn2a.i===6?-Math.PI/2:0);
+  tn2aEmit({warn:tn2aHint()});return true;
+}
+let tn2aUiTime=0;
+function tn2aTick(dt){
+  if(!tn2a.active||!lab3)return;
+  if(anims.some(a=>a.obj===lab3.probe))sensorLead(lab3,tn2aNearFlask());
+  if(!tn2a.playing)return;
+  if(tn2a.i===5){tn2a.hours=Math.min(2,tn2a.hours+dt*2/6);if(tn2a.hours>=2){tn2a.playing=false;tn2a.i=6;}}   // 2 giờ trong ~6 giây
+  else if(tn2a.i===3||tn2a.i===7){
+    const next=tn2a.records[tn2aCur()].length+1;tn2a.minutes=Math.min(next,tn2a.minutes+dt/3);
+    if(tn2a.minutes===next){tn2a.playing=false;tn2a.awaiting=true;}
+  }
+  tn2aApply();tn2aUiTime+=dt;if(tn2aUiTime>=.2||!tn2a.playing){tn2aUiTime=0;tn2aEmit();}
+}
+function tn2aEnter(){
+  if(tn2a.active)return true;if(!buildLab3())return false;
+  pa1Exit();pa2Exit();tn2bExit();tn2a.active=true;lab3.root.visible=true;document.getElementById('tags').classList.add('pa2-tags');
+  draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;tn2aApply();return true;
+}
+function tn2aHalt(){
+  tn2aDrag=null;tn2aBusy=false;tn2a.playing=false;if(!lab3)return;
+  anims.splice(0,anims.length,...anims.filter(a=>!lab3.root.getObjectById(a.obj.id)));
+  lab3.root.children.filter(o=>o.userData.tn2aSeed).forEach(o=>lab3.root.remove(o));   // hạt đang rơi dở
+}
+function tn2aExit(){
+  if(!tn2a.active)return;tn2a.active=false;tn2a.hover=null;tn2aHalt();lab3.root.visible=false;document.getElementById('tags').classList.remove('pa2-tags');
+  draggables.forEach(g=>g.visible=!g.userData.extra);focus=0;tween=true;dirty=true;
+}
+/* nhãn tên chỉ hiện khi rê chuột / chạm vào dụng cụ, như phương án 1 và 2; nhãn bình cập nhật theo tiến trình */
+function tn2aLabelled(){const L=lab3;return [L.flasks[0],L.flasks[1],L.lamp,L.dish,L.tweezers,L.sensor];}
+function tn2aPick(e){
+  if(!tn2a.active||!lab3)return null;
+  const list=tn2aLabelled();aim(e);const h=raycaster.intersectObjects(list,true).find(h=>shown(h.object));if(!h)return null;
+  let o=h.object;while(o&&!list.includes(o))o=o.parent;return o;
+}
+let tn2aHoverT=0;
+function tn2aHover(g,brief){
+  clearTimeout(tn2aHoverT);if(tn2a.hover!==g){tn2a.hover=g;dirty=true;}
+  if(brief&&g)tn2aHoverT=setTimeout(()=>{tn2a.hover=null;dirty=true;},2200);
+}
+function tn2aFlaskText(k){
+  const parts=[`Bình ${k+1}`];
+  parts.push(tn2a.seeded[k]?'hạt nảy mầm':tn2a.open[k]?'đã mở nút':'có nút');
+  if(k===1)parts.push(tn2a.lamp?(tn2a.hours>=2?'đã chiếu đèn 2 giờ':'đang chiếu đèn'):'sẽ chiếu đèn');else parts.push('không chiếu đèn');
+  return parts.join(' · ');
+}
+function tn2aTags(){
+  if(!tn2a.active||!lab3||!tn2a.hover)return[];
+  const L=lab3,h=tn2a.hover;
+  const text=new Map([[L.flasks[0],tn2aFlaskText(0)],[L.flasks[1],tn2aFlaskText(1)],[L.lamp,tn2a.lamp?'Đèn 100 W · đang bật':'Đèn 100 W · đang tắt'],[L.dish,'Hạt đậu xanh nảy mầm'],[L.tweezers,'Nhíp gắp hạt'],[L.sensor,'Bộ cảm biến CO₂']]).get(h);
+  const b=new THREE.Box3().setFromObject(h===L.sensor?L.sensor.children[0]:h===L.flasks[0]||h===L.flasks[1]?h:h),c=b.getCenter(new THREE.Vector3());
+  return text?[{text,p:[c.x,b.max.y+.08,c.z]}]:[];
+}
+
+/* =====================================================================
+   THÍ NGHIỆM 2b · ĐỘ ẨM — bàn riêng, chỉ đặt các dụng cụ cần dùng (lấy từ bàn Chuẩn bị):
+   3 bình tam giác có nút (bình 1 giữ khô · bình 2 ngâm nước ấm 2 giờ rồi gạn · bình 3 ngâm ngập nước)
+   · 500 g đậu xanh khô · nước lọc (pha nước ấm 40 °C) · cốc 250 ml (đong / ngâm) · bộ cảm biến CO₂
+   ===================================================================== */
+const tn2b={active:false,hover:null};
+let lab4=null;
+function buildLab4(){
+  if(lab4)return true;
+  if([3,4,11,13].some(n=>!rawGLB[SPEC[n].url])||CO2_PARTS.some(url=>!rawGLB[url]))return false;
+  const root=new THREE.Group();scene.add(root);
+  const tool=(n,pos,opt={})=>{const g=wrap(rawGLB[SPEC[n].url].clone(true),{...SPEC[n],center:true,...opt});g.position.set(...pos);root.add(g);shadowsFor(g);return g;};
+  const flasks=[[-1.55,0,-.5],[-.3,0,-.5],[.95,0,-.5]].map(p=>{const f=tool(3,p);f.traverse(o=>{if(o.isMesh&&o.material===glass)o.material=glassThin;});return f;});
+  const beaker=tool(4,[2.2,0,-.45]);
+  const water=tool(11,[1.45,0,1.05]);   // không để sát mép phải: bảng hướng dẫn che mất góc phải phía trước
+  const stock=tool(13,[.2,0,1.3]);
+  const S=makeSensor(root,[-2.3,0,.9]);sensorScreen(S,'— ppm','','CHỜ LẮP ĐẦU DÒ');
+  lab4={root,flasks,beaker,water,stock,...S};root.visible=false;return true;
+}
+function tn2bEnter(){
+  if(tn2b.active)return true;if(!buildLab4())return false;
+  pa1Exit();pa2Exit();tn2aExit();tn2b.active=true;lab4.root.visible=true;document.getElementById('tags').classList.add('pa2-tags');
+  draggables.forEach(g=>g.visible=false);focus=0;setAuto(false);if(under)setUnder(false);yaw=0;pitch=.7;distance=16.5;tween=true;dirty=true;return true;
+}
+function tn2bExit(){
+  if(!tn2b.active)return;tn2b.active=false;tn2b.hover=null;lab4.root.visible=false;document.getElementById('tags').classList.remove('pa2-tags');
+  draggables.forEach(g=>g.visible=!g.userData.extra);focus=0;tween=true;dirty=true;
+}
+/* nhãn tên chỉ hiện khi rê chuột / chạm vào dụng cụ */
+function tn2bLabelled(){const L=lab4;return [...L.flasks,L.beaker,L.water,L.stock,L.sensor];}
+function tn2bPick(e){
+  if(!tn2b.active||!lab4)return null;
+  const list=tn2bLabelled();aim(e);const h=raycaster.intersectObjects(list,true).find(h=>shown(h.object));if(!h)return null;
+  let o=h.object;while(o&&!list.includes(o))o=o.parent;return o;
+}
+let tn2bHoverT=0;
+function tn2bHover(g,brief){
+  clearTimeout(tn2bHoverT);if(tn2b.hover!==g){tn2b.hover=g;dirty=true;}
+  if(brief&&g)tn2bHoverT=setTimeout(()=>{tn2b.hover=null;dirty=true;},2200);
+}
+function tn2bTags(){
+  if(!tn2b.active||!lab4||!tn2b.hover)return[];
+  const L=lab4,h=tn2b.hover;
+  const text=new Map([[L.flasks[0],'Bình 1 · hạt khô, đậy kín'],[L.flasks[1],'Bình 2 · ngâm nước ấm 2 giờ rồi gạn'],[L.flasks[2],'Bình 3 · ngâm ngập nước ấm'],
+    [L.beaker,'Cốc 250 ml'],[L.water,'Nước lọc · pha nước ấm 40 °C'],[L.stock,'500 g đậu xanh khô'],[L.sensor,'Bộ cảm biến CO₂']]).get(h);
+  const b=new THREE.Box3().setFromObject(h===L.sensor?L.sensor.children[0]:h),c=b.getCenter(new THREE.Vector3());
+  return text?[{text,p:[c.x,b.max.y+.08,c.z]}]:[];
+}
+
 /* ---------------- camera (cùng cách tính với bản cũ để chấm số khớp) ---------------- */
 const TARGETS=[[0,.35,.15],[-3.3,1.3,-.8],[-2.15,.15,-.5],[.525,.65,-.8],[2.1,.5,-.8],[-3.15,.15,1.5],[-1.55,.10,1.35],[-.45,.08,1.35],[.65,.01,1.35],[1.8,.05,1.35],[3.2,.5,-.8],[4.35,.65,-.8],[3,.13,1.35],[4.25,.13,1.35]];
 const FOCUS_DIST=[1,.31,.27,.27,.19,.28,.16,.13,.14,.17,.19,.22,.16,.16];
@@ -1975,8 +2388,9 @@ const cur={eye:new THREE.Vector3(0,12,14),target:new THREE.Vector3()},want={eye:
 function offsetOf(n){ const g=items[n]&&items[n][0]; return g?[g.position.x-g.userData.home.x,g.position.y-g.userData.home.y,g.position.z-g.userData.home.z]:[0,0,0]; }
 function computeWant(){
   const w=canvas.clientWidth||1,h=canvas.clientHeight||1,aspect=w/h,lab1=pa1.active&&!focus;
-  const o=lab1||pa2.active?[0,0,0]:offsetOf(focus),t=pa2.active?[innerWidth>820?.55:-.4,.45,.2]:lab1?PA1_VIEW.t:TARGETS[focus];
-  const dist=distance*(pa2.active?.65:lab1?PA1_VIEW.fd:FOCUS_DIST[focus])*Math.max(1,(focus?.65:1.05)/aspect);
+  const bench=pa2.active||tn2a.active||tn2b.active;   // bàn riêng của phương án 2 / thí nghiệm 2a: nhìn toàn bàn, không cận cảnh theo dụng cụ
+  const o=lab1||bench?[0,0,0]:offsetOf(focus),t=pa2.active?[innerWidth>820?.55:-.4,.45,.2]:tn2a.active||tn2b.active?[innerWidth>820?.35:-.6,.55,.3]:lab1?PA1_VIEW.t:TARGETS[focus];
+  const dist=distance*(bench?.65:lab1?PA1_VIEW.fd:FOCUS_DIST[focus])*Math.max(1,(focus?.65:1.05)/aspect);
   want.target.set(t[0]+o[0],t[1],t[2]+o[2]);   // chỉ theo dịch chuyển ngang
   want.eye.set(want.target.x+Math.sin(yaw)*Math.cos(pitch)*dist,want.target.y+Math.sin(pitch)*dist,want.target.z+Math.cos(yaw)*Math.cos(pitch)*dist);
 }
@@ -2030,6 +2444,8 @@ function loop(now){
   if(pa1Phys(dt)) dirty=true;
   pa1Tick(dt);
   pa2Tick(dt);
+  tn2aTick(dt);
+  if(lab3&&tn2a.active&&lab3.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab3.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
   if(lab2&&pa2.active&&lab2.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab2.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
   if(lab&&pa1.active&&lab.rings.some(r=>r.visible)){ const s=1+.06*Math.sin(now*.006); lab.rings.forEach(r=>{ if(r.visible){ r.scale.setScalar((r.userData.base||1)*s); r.material.opacity=.55+.35*(.5+.5*Math.sin(now*.006)); } }); dirty=true; }
   if(dirty){ dirty=false; render(); }
@@ -2042,9 +2458,10 @@ function setUnder(on){ under=on; pitch=on?-.48:.82; view.title=on?'Xem từ phí
 rotate.onclick=()=>setAuto(!auto);
 view.onclick=()=>{ setAuto(false); setUnder(!under); };
 document.getElementById('reset').onclick=()=>{
-  setAuto(false); focus=0; yaw=0; distance=16.5; setUnder(false); if(pa1.active) pitch=.62;
+  setAuto(false); focus=0; yaw=0; distance=16.5; setUnder(false); if(pa1.active) pitch=.62; if(pa2.active||tn2a.active||tn2b.active) pitch=.7;
   draggables.forEach(g=>{ g.position.x=g.userData.home.x; g.position.z=g.userData.home.z; g.userData.lift=0; });
-  pa1Rings(); dirty=true; window.bellModel.onFocusChange&&window.bellModel.onFocusChange(0);
+  if(pa1.active) pa1Rings();   // pa1Rings bật lại túi vải của phương án 1 — chỉ gọi khi đang ở phương án 1
+  dirty=true; window.bellModel.onFocusChange&&window.bellModel.onFocusChange(0);
 };
 const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2(),floor=new THREE.Plane(new THREE.Vector3(0,1,0),0),hitP=new THREE.Vector3();
 function aim(e){ const r=canvas.getBoundingClientRect(); ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1); raycaster.setFromCamera(ndc,camera); }
@@ -2113,6 +2530,12 @@ canvas.addEventListener('pointerdown',e=>{
       if(pa2Down(e)){ pa2Hover(null); return; }      // phương án 2: kéo vật của bước hiện tại
       if(e.pointerType!=='mouse') pa2Hover(pa2Pick(e),true);      // chạm vào dụng cụ (điện thoại): hiện tên
     }
+    if(tn2b.active&&e.pointerType!=='mouse') tn2bHover(tn2bPick(e),true);      // chạm vào dụng cụ (điện thoại): hiện tên
+    if(tn2a.active){
+      if(tn2aDown(e)){ tn2aHover(null); return; }      // thí nghiệm 2a: kéo đĩa hạt / đầu dò
+      if(tn2aClickAt(e)) return;                        // bấm nút cao su / bật đèn
+      if(e.pointerType!=='mouse') tn2aHover(tn2aPick(e),true);
+    }
     const h=pickHit(e);
     if(h&&pa1.active){
       const sk=stopperOf(h.obj); if(sk>=0&&stopperDown(sk,e)) return;      // nút cao su: cầm nhấc lên
@@ -2127,10 +2550,12 @@ canvas.addEventListener('pointerdown',e=>{
 });
 canvas.addEventListener('pointermove',e=>{
   const prev=pointers.get(e.pointerId);
+  if(!prev&&tn2b.active){ const g=tn2bPick(e); tn2bHover(g); canvas.style.cursor=g?'pointer':'default'; return; }
+  if(!prev&&tn2a.active){ const g=tn2aPick(e); tn2aHover(g); canvas.style.cursor=tn2aHit(e)?'grab':g?'pointer':'default'; return; }
   if(!prev&&pa2.active){ const g=pa2Pick(e); pa2Hover(g); canvas.style.cursor=pa2Hit(e)?'grab':g?'pointer':'default'; return; }
   if(!prev){ const h=pickHit(e),g=h&&h.g; if(pa1.active&&lab) pa1Hover(g); canvas.style.cursor=g&&(!pa1.active||pa1CanDrag(g)||stopperOf(h.obj)>=0)?'grab':g?'pointer':'default'; return; }
   const dx=e.clientX-prev.x,dy=e.clientY-prev.y; pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-  if(stopperMove(e)||pa2Move(e)) return;
+  if(stopperMove(e)||pa2Move(e)||tn2aMove(e)) return;
   if(drag){
     const p=floorPoint(e); if(!p) return;
     drag.g.position.x=p.x+drag.dx; drag.g.position.z=p.z+drag.dz; collide(drag.g);
@@ -2144,6 +2569,7 @@ canvas.addEventListener('pointermove',e=>{
   pointers.delete(e.pointerId); pinch=0;
   if(stopDrag&&!pointers.size) stopperUp();
   if(pa2Drag&&!pointers.size) pa2Up();
+  if(tn2aDrag&&!pointers.size) tn2aUp();
   if(drag&&!pointers.size){ const g=drag.g; g.userData.lift=0; drag=null; if(pa1.active) pa1Drop(g); }
   canvas.style.cursor='';
 }));
@@ -2175,7 +2601,16 @@ window.bellModel={
   render:()=>{ computeWant(); cur.eye.copy(want.eye); cur.target.copy(want.target); tween=false; render(); },
   setFocus:n=>{ focus=n; if(under) setUnder(false); else{ pitch=Math.max(pitch,-.16); tween=true; } setAuto(false); },
   offsetOf,
-  tags:()=>pa2.active?pa2Tags():pa1Tags(),
+  tags:()=>pa2.active?pa2Tags():tn2a.active?tn2aTags():tn2b.active?tn2bTags():pa1Tags(),
+  tn2b:{enter:tn2bEnter,exit:tn2bExit},
+  tn2a:{enter:tn2aEnter,exit:tn2aExit,state:tn2aState,hint:tn2aHint,
+    quick:()=>{ if(!anims.length) tn2aDo(); },
+    play:on=>{ if(!tn2a.active||![3,5,7].includes(tn2a.i)||tn2a.awaiting) return; tn2a.playing=on; tn2aEmit(); },
+    record:()=>{ if(!tn2a.active||!tn2a.awaiting) return null; const k=tn2aCur(),row={flask:k,minute:Math.round(tn2a.minutes)}; tn2a.records[k].push(row); tn2a.awaiting=false;
+      if(tn2a.records[k].length===5){ tn2a.i=k?8:4; tn2a.minutes=0; } tn2aApply(); return row; },
+    restart:()=>{ Object.assign(tn2a,{i:0,open:[false,false],seeded:[false,false],lamp:false,hours:0,minutes:0,playing:false,awaiting:false,records:[[],[]],count:[0,0]}); tn2aHalt(); tn2aApply(); tn2aEmit(); },
+    set onChange(f){ tn2a.onChange=f; }
+  },
   pa2:{enter:pa2Enter,exit:pa2Exit,state:pa2State,quick:()=>{ if(!anims.length) pa2Do(); },hint:pa2Hint,
     play:on=>{if(!pa2.active||![3,6].includes(pa2.i)||pa2.awaiting)return;pa2.playing=on;pa2Emit();},
     record:()=>{if(!pa2.active||!pa2.awaiting)return null;const row={minute:Math.round(pa2.minutes),ppm:pa2PPM()};pa2.records.push(row);pa2.awaiting=false;if(pa2.records.length===5)pa2.i=7;pa2Apply();return row;},
