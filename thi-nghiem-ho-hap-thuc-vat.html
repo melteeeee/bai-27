@@ -805,7 +805,7 @@ function renderTN2B(){
   const head=`<div class="xseg"><button type="button" data-g="0" aria-pressed="false">Thí nghiệm 1</button><button type="button" data-g="1" aria-pressed="true">Thí nghiệm 2</button></div>
     <div class="xseg sub">${EXPS.map((x,i)=>x.grp===1?`<button type="button" data-x="${i}" aria-pressed="${i===3}">${x.label}</button>`:'').join('')}</div>`;
   if(!m?.tn2b?.enter()){ setPanel(head+'<div class="panel-t">Đang tải dụng cụ cho thí nghiệm 2b…</div>'); bindExpTabs(); setActions([]); return; }
-  const s=m.tn2b.state(),f=s.flask+1,measuring=s.i===9||s.i===11||s.i===13;
+  const s=m.tn2b.state(),f=s.flask+1,measuring=s.i===10||s.i===13||s.i===16;
   // số đo không hiện ở bảng / đồng hồ / nút: học sinh tự đọc trên màn hình máy đo và tự ghi vào phiếu
   const minute=Math.round(s.minutes),written=s.awaiting&&String(getVal(`p3b-b${f}-min-${minute}`,'')).trim()!=='';
   const clockText=()=>s.i===5?`⏱ ${fmtHours(s.hours)} / 2 giờ · ngâm bình 2`:`⏱ ${s.minutes.toFixed(1)} / 5 phút · bình ${f}`;
@@ -825,10 +825,13 @@ function renderTN2B(){
     ['Ngâm bình 2 trong 2 giờ','Để hạt ở bình 2 ngâm trong nước ấm 2 giờ. Thời gian được tua nhanh trong mô phỏng.','▶ Tua 2 giờ'],
     ['Gạn nước bình 2','Kéo <span class="b">bình 2</span> tới <span class="b">cốc</span> để gạn hết nước ra, hạt trong bình vẫn ẩm.'],
     ['Đậy nút bình 2','Bấm vào <span class="b">bình 2</span> để đậy kín nút sau khi gạn nước.'],
+    ['Mở nút bình 1','Bấm vào <span class="b">bình 1</span> để mở nút, chuẩn bị đưa đầu dò cảm biến vào bình.'],
     ['Lắp cảm biến vào bình 1','Kéo <span class="b">đầu dò cảm biến</span> tới miệng <span class="b">bình 1</span> để đo nồng độ CO₂, tương tự phương án 2 của Thí nghiệm 1.'],
     ['Đo nồng độ CO₂ ở bình 1',measure,'Bắt đầu đo'],
+    ['Mở nút bình 2','Bấm vào <span class="b">bình 2</span> để mở nút, chuẩn bị chuyển đầu dò sang.'],
     ['Chuyển cảm biến sang bình 2','Kéo <span class="b">đầu dò</span> từ bình 1 sang miệng <span class="b">bình 2</span>. Bình 1 được đậy lại nút.'],
     ['Đo nồng độ CO₂ ở bình 2',measure,'Bắt đầu đo'],
+    ['Mở nút bình 3','Bấm vào <span class="b">bình 3</span> để mở nút, chuẩn bị chuyển đầu dò sang.'],
     ['Chuyển cảm biến sang bình 3','Kéo <span class="b">đầu dò</span> từ bình 2 sang miệng <span class="b">bình 3</span>. Bình 2 được đậy lại nút.'],
     ['Đo nồng độ CO₂ ở bình 3',measure,'Bắt đầu đo'],
     ['Hoàn thiện Phiếu số 3','Đã đo xong ba bình. Mở phiếu để kiểm tra số liệu, tự viết nồng độ CO₂ tăng hay giảm ở mỗi bình, viết kết luận rồi nộp phiếu để sang thí nghiệm 2c.','Mở Phiếu số 3']
@@ -2413,20 +2416,21 @@ function tn2aTags(){
    Bước 1 · 0 mở nút 3 bình · 1 đổ 50 g hạt khô vào mỗi bình
    Bước 2 · 2 đậy nút bình 1 (giữ khô) · 3 rót nước ấm ngập hạt vào bình 2, bình 3 · 4 đậy nút bình 3 · 5 ngâm 2 giờ (tua)
             · 6 gạn hết nước bình 2 (đổ ra cốc) · 7 đậy nút bình 2
-   Bước 3 · 8 lắp đầu dò bình 1 · 9 đo · 10 chuyển sang bình 2 · 11 đo · 12 chuyển sang bình 3 · 13 đo · 14 hoàn thiện phiếu số 3
+   Bước 3 · 8 mở nút bình 1 · 9 lắp đầu dò bình 1 · 10 đo · 11 mở nút bình 2 · 12 chuyển đầu dò sang bình 2 · 13 đo
+            · 14 mở nút bình 3 · 15 chuyển đầu dò sang bình 3 · 16 đo · 17 hoàn thiện phiếu số 3
    ===================================================================== */
 const tn2b={active:false,hover:null,i:0,open:[false,false,false],seeded:[false,false,false],water:[0,0,0],drained:false,hours:0,minutes:0,playing:false,awaiting:false,records:[[],[],[]],probeAt:-1,onChange:null};
 const TN2B_RATE=[15,420,90];   // ppm tăng mỗi phút (minh hoạ): hạt khô hô hấp rất yếu; hạt ngâm rồi gạn (ẩm, đủ khí) mạnh nhất; hạt ngập nước thiếu O₂ nên yếu
-const TN2B_FINAL=14,TN2B_CLOSE={2:0,4:2,7:1},TN2B_PROBE={8:0,10:1,12:2};
-const TN2B_DRAG={1:'stock',3:'beaker',6:'flask2',8:'probe',10:'probe',12:'probe'};
+const TN2B_FINAL=17,TN2B_CLOSE={2:0,4:2,7:1},TN2B_OPEN={8:0,11:1,14:2},TN2B_PROBE={9:0,12:1,15:2};   // mở nút trước, rồi mới đưa đầu dò vào bình
+const TN2B_DRAG={1:'stock',3:'beaker',6:'flask2',9:'probe',12:'probe',15:'probe'};
 const TN2B_LEVEL=.55;   // mực nước ngâm trong bình (cao hơn lớp hạt khoảng 4 cm)
 let lab4=null,tn2bBusy=false,tn2bDrag=null;
-const tn2bCur=()=>tn2b.i<=9?0:tn2b.i<=11?1:2;   // bình đang đo
+const tn2bCur=()=>tn2b.i<=10?0:tn2b.i<=13?1:2;   // bình đang đo
 const tn2bPPM=()=>Math.round(400+TN2B_RATE[tn2bCur()]*tn2b.minutes);
-const tn2bMeasuring=()=>tn2b.i===9||tn2b.i===11||tn2b.i===13;
+const tn2bMeasuring=()=>tn2b.i===10||tn2b.i===13||tn2b.i===16;
 function tn2bEmit(msg){dirty=true;tn2b.onChange?.(msg||null);}
 function tn2bState(){
-  const click=tn2b.i===0||TN2B_CLOSE[tn2b.i]!==undefined,drag=!!TN2B_DRAG[tn2b.i];
+  const click=tn2b.i===0||TN2B_CLOSE[tn2b.i]!==undefined||TN2B_OPEN[tn2b.i]!==undefined,drag=!!TN2B_DRAG[tn2b.i];
   return {i:tn2b.i,open:tn2b.open.slice(),seeded:tn2b.seeded.slice(),water:tn2b.water.map(w=>w>.5),drained:tn2b.drained,hours:tn2b.hours,minutes:tn2b.minutes,playing:tn2b.playing,awaiting:tn2b.awaiting,
     records:tn2b.records.map(r=>r.length),flask:tn2bCur(),busy:tn2bBusy,act:click||drag,how:drag?'drag':click?'click':'',done:tn2b.i===TN2B_FINAL};
 }
@@ -2449,7 +2453,7 @@ function buildLab4(){
     const st=new THREE.Group();f.add(st);f.updateMatrixWorld(true);const list=[];
     f.traverse(o=>{if(o.isMesh&&/cork|nut cao su/i.test(o.material?.name||o.name||''))list.push(o);});list.forEach(m=>st.attach(m));
     const h=new THREE.Box3().setFromObject(st).min.y;
-    st.userData={closed:st.position.clone(),aside:st.position.clone().add(new THREE.Vector3(.45,-h,.6))};
+    st.userData={closed:st.position.clone(),aside:f.position.clone().add(st.position).add(new THREE.Vector3(.45,-h,.6)),flask:f};   // aside: toạ độ trên bàn (nút mở nằm trên bàn, không gắn theo bình)
     return st;
   });
   // 50 g hạt đậu xanh khô trong mỗi bình (hiện khi đã đổ hạt)
@@ -2477,13 +2481,19 @@ function buildLab4(){
   lab4={root,flasks,flaskHome:flasks.map(f=>f.position.clone()),corks,piles,waters,beaker,beakerHome:beaker.position.clone(),beakerWater,stream,stock,stockHome:stock.position.clone(),attach,rings,flow:null,...S};
   root.visible=false;return true;
 }
+/* nút đã mở nằm trên bàn (gắn vào bàn), đậy lại thì gắn về bình — nhấc bình đi gạn nước, nút không bay theo */
+function tn2bCorkTo(k,open,anim,onDone){
+  const L=lab4,c=L.corks[k],par=open?L.root:c.userData.flask,to=open?c.userData.aside:c.userData.closed;
+  if(c.parent!==par)par.attach(c);
+  if(anim)animateTo(c,to.toArray(),.55,onDone,.45);else{c.position.copy(to);c.rotation.set(0,0,0);}
+}
 const tn2bBeakerLevel=()=>.5-.16*tn2b.water.filter((w,k)=>k&&w>0).length+(tn2b.drained?.14:0);   // nước còn trong cốc (đơn vị chiều cao)
 /* đặt mọi thứ theo trạng thái (không đụng vật đang kéo / đang chạy hoạt cảnh) */
 function tn2bApply(){
   const L=lab4;if(!L)return;
   if(!tn2bBusy&&!tn2bDrag){
-    L.corks.forEach((c,k)=>c.position.copy(tn2b.open[k]?c.userData.aside:c.userData.closed));
     L.flasks.forEach((f,k)=>{f.position.copy(L.flaskHome[k]);f.rotation.set(0,0,0);});
+    L.corks.forEach((c,k)=>tn2bCorkTo(k,tn2b.open[k],false));
     L.stock.position.copy(L.stockHome);L.stock.rotation.set(0,0,0);
     L.beaker.position.copy(L.beakerHome);L.beaker.rotation.set(0,0,0);
     const at=tn2b.probeAt>=0?L.attach[tn2b.probeAt]:null;
@@ -2515,13 +2525,13 @@ function tn2bRings(){
   if(!tn2b.active||tn2bBusy)return;
   const put=(r,o,sc)=>{const w=tn2bWorld(o);r.visible=true;r.position.set(w.x,.008,w.z);r.scale.setScalar(sc);r.userData.base=sc;};
   if(tn2b.i===0){const k=tn2b.open.indexOf(false);if(k>=0)put(L.rings[0],L.flasks[k],1);return;}
-  if(TN2B_CLOSE[tn2b.i]!==undefined){put(L.rings[0],L.flasks[TN2B_CLOSE[tn2b.i]],1);return;}
+  const ck=TN2B_CLOSE[tn2b.i]??TN2B_OPEN[tn2b.i];if(ck!==undefined){put(L.rings[0],L.flasks[ck],1);return;}
   const src=tn2bSrc();if(!src)return;
   if(!tn2bDrag)put(L.rings[0],src,src===L.probe?.5:src===L.beaker?.7:1);
   const t=tn2bTarget();if(t)put(L.rings[1],t,t===L.beaker?.7:1);
 }
 function tn2bHint(){
-  return ['Bấm vào nút cao su của từng bình để mở nắp.','Kéo đĩa đậu xanh khô tới bình đã mở nắp rồi thả tay.','Bấm vào bình 1 để đậy kín nút (giữ hạt khô).','Kéo cốc nước ấm tới bình 2 hoặc bình 3 rồi thả tay để rót nước ngập hạt.','Bấm vào bình 3 để đậy kín nút.','','Kéo bình 2 tới cốc để gạn hết nước.','Bấm vào bình 2 để đậy kín nút.','Kéo đầu dò cảm biến tới miệng bình 1.','','Kéo đầu dò từ bình 1 sang miệng bình 2.','','Kéo đầu dò từ bình 2 sang miệng bình 3.'][tn2b.i]||'';
+  return ['Bấm vào nút cao su của từng bình để mở nắp.','Kéo đĩa đậu xanh khô tới bình đã mở nắp rồi thả tay.','Bấm vào bình 1 để đậy kín nút (giữ hạt khô).','Kéo cốc nước ấm tới bình 2 hoặc bình 3 rồi thả tay để rót nước ngập hạt.','Bấm vào bình 3 để đậy kín nút.','','Kéo bình 2 tới cốc để gạn hết nước.','Bấm vào bình 2 để đậy kín nút.','Bấm vào bình 1 để mở nút.','Kéo đầu dò cảm biến tới miệng bình 1.','','Bấm vào bình 2 để mở nút.','Kéo đầu dò từ bình 1 sang miệng bình 2.','','Bấm vào bình 3 để mở nút.','Kéo đầu dò từ bình 2 sang miệng bình 3.'][tn2b.i]||'';
 }
 function tn2bFinish(msg){tn2bBusy=false;tn2b.i++;tween=true;tn2bApply();tn2bEmit({ok:msg});}
 /* dòng nước + mực nước thay đổi đều trong dur giây (đổ từ cốc vào bình, hoặc gạn từ bình ra cốc) */
@@ -2536,9 +2546,9 @@ function tn2bDo(k){
   const i=tn2b.i,busy=()=>{tn2bBusy=true;L.rings.forEach(r=>r.visible=false);};
   if(i===0){
     k=k??tn2b.open.indexOf(false);if(k<0||tn2b.open[k])return;busy();
-    animateTo(L.corks[k],L.corks[k].userData.aside.toArray(),.55,()=>{tn2b.open[k]=true;
+    tn2bCorkTo(k,true,true,()=>{tn2b.open[k]=true;
       if(tn2b.open.every(Boolean))tn2bFinish('Đã mở nút cả ba bình.');
-      else{tn2bBusy=false;tn2bApply();tn2bEmit({ok:`Đã mở nút bình ${k+1}. Tiếp tục với bình ${tn2b.open.indexOf(false)+1}.`});}},.5);
+      else{tn2bBusy=false;tn2bApply();tn2bEmit({ok:`Đã mở nút bình ${k+1}. Tiếp tục với bình ${tn2b.open.indexOf(false)+1}.`});}});
   }
   else if(i===1){
     const f=(k!==undefined&&k>=0&&tn2bTargets().includes(L.flasks[k]))?L.flasks[k]:tn2bTarget();if(!f)return;k=L.flasks.indexOf(f);busy();
@@ -2553,8 +2563,8 @@ function tn2bDo(k){
   }
   else if(TN2B_CLOSE[i]!==undefined){
     k=TN2B_CLOSE[i];busy();
-    animateTo(L.corks[k],L.corks[k].userData.closed.toArray(),.55,()=>{tn2b.open[k]=false;
-      tn2bFinish(k===0?'Đã đậy kín bình 1: hạt được giữ khô.':k===2?'Đã đậy kín bình 3: hạt ngâm ngập trong nước ấm.':'Đã đậy kín bình 2 sau khi gạn nước.');},.5);
+    tn2bCorkTo(k,false,true,()=>{tn2b.open[k]=false;
+      tn2bFinish(k===0?'Đã đậy kín bình 1: hạt được giữ khô.':k===2?'Đã đậy kín bình 3: hạt ngâm ngập trong nước ấm.':'Đã đậy kín bình 2 sau khi gạn nước.');});
   }
   else if(i===3){
     const f=(k!==undefined&&k>=0&&tn2bTargets().includes(L.flasks[k]))?L.flasks[k]:tn2bTarget();if(!f)return;k=L.flasks.indexOf(f);busy();
@@ -2577,10 +2587,13 @@ function tn2bDo(k){
       });
     },0,-1.35),.35,0);
   }
+  else if(TN2B_OPEN[i]!==undefined){
+    k=TN2B_OPEN[i];busy();
+    tn2bCorkTo(k,true,true,()=>{tn2b.open[k]=true;tn2bFinish(`Đã mở nút bình ${k+1}, sẵn sàng đưa đầu dò vào bình.`);});
+  }
   else if(TN2B_PROBE[i]!==undefined){
     k=TN2B_PROBE[i];busy();const prev=tn2b.probeAt;
-    if(prev>=0){tn2b.open[prev]=false;animateTo(L.corks[prev],L.corks[prev].userData.closed.toArray(),.5,null,.4);}   // bình vừa đo đậy lại nút
-    tn2b.open[k]=true;animateTo(L.corks[k],L.corks[k].userData.aside.toArray(),.5,null,.4);   // nhấc nút bình sắp đo, thay bằng đầu dò
+    if(prev>=0){tn2b.open[prev]=false;tn2bCorkTo(prev,false,true);}   // bình vừa đo đậy lại nút
     L.probe.rotation.x=prev>=0?0:L.probe.rotation.x;
     animateTo(L.probe,L.attach[k].toArray(),.75,()=>{tn2b.probeAt=k;tn2bFinish(`Đã lắp đầu dò kín miệng bình ${k+1}, máy đo sẵn sàng.`);},.45,-Math.PI/2);
   }
@@ -2591,7 +2604,7 @@ function tn2bClickAt(e){
   const L=lab4;if(!tn2b.active||!L||tn2bBusy||anims.length)return false;
   aim(e);const hit=k=>raycaster.intersectObject(L.flasks[k],true).length;
   if(tn2b.i===0){const k=[0,1,2].find(k=>!tn2b.open[k]&&hit(k));if(k===undefined)return false;tn2bDo(k);return true;}
-  const c=TN2B_CLOSE[tn2b.i];if(c!==undefined&&hit(c)){tn2bDo();return true;}
+  const c=TN2B_CLOSE[tn2b.i]??TN2B_OPEN[tn2b.i];if(c!==undefined&&hit(c)){tn2bDo();return true;}
   return false;
 }
 function tn2bHit(e){
