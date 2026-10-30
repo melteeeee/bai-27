@@ -1925,7 +1925,7 @@ const pa2={active:false,hover:null,i:0,sown:[false,false],days:0,minutes:0,playi
 const PA2_DRAG={0:'paper',1:'stock',2:'water',4:'dish2',5:'probe'};   // bước kéo–thả: vật cần kéo (bước 3, 6, 7 dùng nút)
 let pa2Busy=false,pa2Drag=null;
 let lab2=null;
-const pa2PPM=()=>Math.round(400+384*pa2.minutes); // chuỗi minh hoạ; 2320 ppm ở phút 5
+const pa2PPM=()=>co2Reading(CO2_AIR,380,pa2.minutes,1.3);   // hạt nảy mầm trong bình 250 ml: ≈ 1900 ppm ở phút 5
 function pa2State(){ return {...pa2,onChange:undefined,hover:undefined,sown:pa2.sown.slice(),busy:pa2Busy,drag:!!PA2_DRAG[pa2.i],ppm:pa2PPM(),records:pa2.records.map(r=>({...r}))}; }
 function pa2Emit(msg){ dirty=true; pa2.onChange?.(msg||null); }
 /* ---------------- bộ cảm biến CO₂ dùng chung cho các bàn riêng (phương án 2, thí nghiệm 2a) ----------------
@@ -1954,6 +1954,17 @@ function makeSensor(root,pos){
   return {sensor,meter,probe,wire,lead,cable,display,texture,probeHome:probe.position.clone(),leadKey:''};
 }
 /* vị trí đầu dò (toạ độ của bộ cảm biến) khi lắp kín miệng bình tam giác flask */
+/* số đọc của cảm biến CO₂ (ppm) sau t phút kể từ lúc lắp đầu dò vào bình — số liệu minh hoạ nhưng cư xử như máy thật:
+   · nồng độ trong bình: start + rate·t, chậm dần nhẹ về cuối (hạt dùng bớt O₂, CO₂ tích lại)
+   · cảm biến cần ~30 giây để ổn định: số đọc đi lên từ mức không khí rồi mới bám theo nồng độ trong bình
+   · dao động nhỏ (±15–40 ppm) cố định theo thời điểm: dừng ở phút nào thì số của phút đó không nhảy */
+const CO2_AIR=420;
+function co2Reading(start,rate,t,seed){
+  const inFlask=start+rate*t*(1-.04*t);
+  const shown=CO2_AIR+(inFlask-CO2_AIR)*(1-Math.exp(-t/.15));
+  const noise=(12+.006*shown)*(Math.sin(t*7.3+seed)*.6+Math.sin(t*17.9+seed*2.1)*.4);
+  return Math.max(0,Math.round(shown+noise));
+}
 const sensorAttachAt=(S,flask)=>new THREE.Vector3(flask.position.x-S.sensor.position.x-.58,1.77,flask.position.z-S.sensor.position.z+.105);
 /* màn hình máy đo: số đọc to ở giữa, thời gian và trạng thái bên dưới */
 function sensorScreen(S,value,time,status){
@@ -2253,14 +2264,15 @@ function pa2Tags(){
    · 4 bật đèn chiếu bình 2 · 5 tua 2 giờ · 6 chuyển đầu dò sang bình 2 · 7 đo bình 2 (5 phút) · 8 hoàn thiện phiếu số 3
    ===================================================================== */
 const tn2a={active:false,hover:null,i:0,open:[false,false],seeded:[false,false],count:[0,0],lamp:false,hours:0,minutes:0,playing:false,awaiting:false,records:[[],[]],onChange:null};
-const TN2A_RATE=[384,470];   // ppm tăng mỗi phút (minh hoạ): bình 2 dưới đèn 100 W ấm lên nên hạt hô hấp mạnh hơn
+const TN2A_RATE=[380,460];   // ppm tăng mỗi phút (minh hoạ): bình 2 dưới đèn 100 W ấm lên nên hạt hô hấp mạnh hơn
 const TN2A_DRAG={1:'tweezers',2:'probe',6:'probe'},TN2A_CLICK={0:'cork',4:'lamp'};
 let lab3=null,tn2aBusy=false,tn2aDrag=null;
 const TN2A_TRIPS=4;   // số lần nhíp gắp cho MỖI bình (gắp xen kẽ bình 1, bình 2 → hai bình cùng lượng hạt)
 const LAMP_REACH=1.16;   // chao đèn lệch khỏi tâm đế bấy nhiêu theo phương ngang (đo trên model đèn)
 const LAMP_SIDE=.42;     // chao đèn đặt lệch sang phải trục bình 2 bấy nhiêu: đầu dò lắp trên miệng bình chiếm ±0,2 → chao không đè lên đầu dò
 const tn2aCur=()=>tn2a.i<=3?0:1;   // bình đang đo
-const tn2aPPM=()=>Math.round(400+TN2A_RATE[tn2aCur()]*tn2a.minutes);
+const tn2aVal=(k,t)=>co2Reading(CO2_AIR,TN2A_RATE[k],t,2.1+k*1.7);
+const tn2aPPM=()=>tn2aVal(tn2aCur(),tn2a.minutes);
 function tn2aEmit(msg){dirty=true;tn2a.onChange?.(msg||null);}
 function tn2aState(){return {i:tn2a.i,open:tn2a.open.slice(),seeded:tn2a.seeded.slice(),lamp:tn2a.lamp,hours:tn2a.hours,minutes:tn2a.minutes,playing:tn2a.playing,awaiting:tn2a.awaiting,records:tn2a.records.map(r=>r.length),flask:tn2aCur(),busy:tn2aBusy,done:tn2a.i===8,act:!!(TN2A_DRAG[tn2a.i]||TN2A_CLICK[tn2a.i]),how:TN2A_DRAG[tn2a.i]?'drag':TN2A_CLICK[tn2a.i]?'click':''};}
 function buildLab3(){
@@ -2321,7 +2333,9 @@ function tn2aApply(){
   L.spot.intensity=tn2a.lamp?6:0;L.beam.visible=tn2a.lamp;
   sensorLead(L,tn2aNearFlask());
   const measuring=tn2a.i===3||tn2a.i===7;
-  sensorScreen(L,measuring?`${tn2aPPM()} ppm`:'— ppm',measuring?`${tn2a.minutes.toFixed(1)} / 5 phút · bình ${tn2aCur()+1}`:'',tn2a.awaiting?'GHI KẾT QUẢ':tn2a.playing&&measuring?'ĐANG ĐO':measuring?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
+  // chưa lắp đầu dò: máy đọc CO₂ không khí · đầu dò còn cắm trong bình đã đo xong: giữ số cuối của bình đó
+  const probeIn=tn2a.i>=7?1:tn2a.i>=3?0:-1;
+  sensorScreen(L,`${measuring?tn2aPPM():probeIn>=0?tn2aVal(probeIn,tn2a.records[probeIn].length===5?5:0):CO2_AIR} ppm`,measuring?`${tn2a.minutes.toFixed(1)} / 5 phút · bình ${tn2aCur()+1}`:'',tn2a.awaiting?'GHI KẾT QUẢ':tn2a.playing&&measuring?'ĐANG ĐO':measuring?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
   tn2aRings();dirty=true;
 }
 const tn2aNearFlask=()=>{const L=lab3,p=L.probe.getWorldPosition(new THREE.Vector3());return L.flasks.reduce((a,f)=>f.position.distanceTo(p)<a.position.distanceTo(p)?f:a);};
@@ -2491,13 +2505,14 @@ function tn2aTags(){
             · 14 mở nút bình 3 · 15 chuyển đầu dò sang bình 3 · 16 đo · 17 hoàn thiện phiếu số 3
    ===================================================================== */
 const tn2b={active:false,hover:null,i:0,open:[false,false,false],seeded:[false,false,false],water:[0,0,0],drained:false,hours:0,minutes:0,playing:false,awaiting:false,records:[[],[],[]],probeAt:-1,onChange:null};
-const TN2B_RATE=[15,420,90];   // ppm tăng mỗi phút (minh hoạ): hạt khô hô hấp rất yếu; hạt ngâm rồi gạn (ẩm, đủ khí) mạnh nhất; hạt ngập nước thiếu O₂ nên yếu
+const TN2B_RATE=[12,200,70];   // ppm tăng mỗi phút (minh hoạ): hạt khô hô hấp rất yếu; hạt mới ngâm 2 giờ rồi gạn (ẩm, đủ khí) mạnh nhất nhưng còn yếu hơn hạt đã nảy mầm; hạt ngập nước thiếu O₂ nên yếu
 const TN2B_FINAL=17,TN2B_CLOSE={2:0,4:2,7:1},TN2B_OPEN={8:0,11:1,14:2},TN2B_PROBE={9:0,12:1,15:2};   // mở nút trước, rồi mới đưa đầu dò vào bình
 const TN2B_DRAG={1:'stock',3:'beaker',6:'flask2',9:'probe',12:'probe',15:'probe'};
 const TN2B_LEVEL=.55;   // mực nước ngâm trong bình (cao hơn lớp hạt khoảng 4 cm)
 let lab4=null,tn2bBusy=false,tn2bDrag=null;
 const tn2bCur=()=>tn2b.i<=10?0:tn2b.i<=13?1:2;   // bình đang đo
-const tn2bPPM=()=>Math.round(400+TN2B_RATE[tn2bCur()]*tn2b.minutes);
+const tn2bVal=(k,t)=>co2Reading(CO2_AIR,TN2B_RATE[k],t,3.4+k*1.9);
+const tn2bPPM=()=>tn2bVal(tn2bCur(),tn2b.minutes);
 const tn2bMeasuring=()=>tn2b.i===10||tn2b.i===13||tn2b.i===16;
 function tn2bEmit(msg){dirty=true;tn2b.onChange?.(msg||null);}
 function tn2bState(){
@@ -2575,7 +2590,8 @@ function tn2bApply(){
   L.piles.forEach((g,k)=>g.visible=tn2b.seeded[k]);
   sensorLead(L,tn2bNearFlask());
   const m=tn2bMeasuring();
-  sensorScreen(L,m?`${tn2bPPM()} ppm`:'— ppm',m?`${tn2b.minutes.toFixed(1)} / 5 phút · bình ${tn2bCur()+1}`:'',tn2b.awaiting?'GHI KẾT QUẢ':tn2b.playing&&m?'ĐANG ĐO':m?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
+  const pk=tn2b.probeAt;   // chưa lắp: CO₂ không khí · đầu dò còn trong bình đã đo xong: số cuối của bình đó
+  sensorScreen(L,`${m?tn2bPPM():pk>=0?tn2bVal(pk,tn2b.records[pk].length===5?5:0):CO2_AIR} ppm`,m?`${tn2b.minutes.toFixed(1)} / 5 phút · bình ${tn2bCur()+1}`:'',tn2b.awaiting?'GHI KẾT QUẢ':tn2b.playing&&m?'ĐANG ĐO':m?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
   tn2bRings();dirty=true;
 }
 const tn2bNearFlask=()=>{const L=lab4,p=L.probe.getWorldPosition(new THREE.Vector3());return L.flasks.reduce((a,f)=>f.position.distanceTo(p)<a.position.distanceTo(p)?f:a);};
@@ -2773,12 +2789,13 @@ function tn2bTags(){
             · 8 đo bình 2 · 9 hoàn thiện phiếu số 3
    ===================================================================== */
 const tn2c={active:false,hover:null,i:0,open:[false,false],seeded:[false,false],count:[0,0],lit:false,matchIn:false,film:false,minutes:0,playing:false,awaiting:false,records:[[],[]],probeAt:-1,onChange:null};
-const TN2C_START=[400,1500],TN2C_RATE=[384,160];   // ppm (minh hoạ): que diêm cháy làm CO₂ trong bình 2 cao sẵn → hạt hô hấp chậm lại, CO₂ tăng ít
+const TN2C_START=[CO2_AIR,4000],TN2C_RATE=[380,150];   // ppm (minh hoạ): một que diêm cháy trong bình 250 ml đẩy CO₂ lên vài nghìn ppm → hạt hô hấp chậm lại, CO₂ tăng ít
 const TN2C_MATCH_REST=[0,.16,.08];   // que diêm nằm trên lớp hạt, giữa đáy bình
 const TN2C_FINAL=9,TN2C_DRAG={1:'tweezers',2:'probe',5:'match',6:'film',7:'probe'},TN2C_CLICK={0:'cork',4:'matches'};
 let lab5=null,tn2cBusy=false,tn2cDrag=null;
 const tn2cCur=()=>tn2c.i<=3?0:1;
-const tn2cPPM=()=>Math.round(TN2C_START[tn2cCur()]+TN2C_RATE[tn2cCur()]*tn2c.minutes);
+const tn2cVal=(k,t)=>co2Reading(TN2C_START[k],TN2C_RATE[k],t,5.2+k*1.3);
+const tn2cPPM=()=>tn2cVal(tn2cCur(),tn2c.minutes);
 const tn2cMeasuring=()=>tn2c.i===3||tn2c.i===8;
 function tn2cEmit(msg){dirty=true;tn2c.onChange?.(msg||null);}
 function tn2cState(){
@@ -2799,6 +2816,26 @@ function makeMatch(){
   g.userData={flame,light};return g;
 }
 const MATCH_HELD=[-.35,Math.PI/2,0],MATCH_LYING=[0,.5,0];   // cầm: que hướng sang phải, đầu que chếch lên · nằm: que nằm ngang trên lớp hạt
+/* màng bọc thực phẩm phủ miệng bình: đo bán kính ngoài của thành bình theo từng độ cao ở phần cổ, dựng mặt tròn xoay ôm sát:
+   mặt màng căng hơi phồng trên miệng → vắt qua vành miệng → bó sát xuống cổ → mép dưới xòe nhăn. Gốc nhóm ở đỉnh miệng bình. */
+function clingFilm(f){
+  f.updateMatrixWorld(true);const c=f.position,v=new THREE.Vector3(),pts=[];
+  f.traverse(o=>{if(!o.isMesh||o.material!==glassThin)return;const a=o.geometry.attributes.position;for(let i=0;i<a.count;i++){v.fromBufferAttribute(a,i).applyMatrix4(o.matrixWorld);pts.push([Math.hypot(v.x-c.x,v.z-c.z),v.y]);}});
+  const top=Math.max(...pts.map(p=>p[1])),STEP=.02,bands=[];
+  pts.forEach(([r,y])=>{const b=Math.round((top-y)/STEP);if(b>=0&&b<=14)bands[b]=Math.max(bands[b]||0,r);});
+  for(let b=1;b<=14;b++)bands[b]=bands[b]||bands[b-1];
+  const lip=bands[0]||.2,gap=.008,tie=8;   // màng bó chặt nhất ở khoảng 8 bậc (16 cm thực ×0,1) dưới miệng
+  const prof=[[0,.022],[lip*.45,.019],[lip*.85,.012],[lip+gap,-.004]];
+  for(let b=1;b<=tie;b++)prof.push([bands[b]+gap*(b===tie?.4:1),-b*STEP]);
+  const rt=bands[tie];prof.push([rt+.025,-(tie+1)*STEP],[rt+.05,-(tie+2.4)*STEP]);
+  const geo=new THREE.LatheGeometry(prof.map(p=>new THREE.Vector2(...p)),64),pos=geo.attributes.position,w=new THREE.Vector3();
+  // nếp nhăn: phần màng dưới chỗ bó lượn sóng quanh cổ bình, càng xuống mép càng nhăn
+  for(let i=0;i<pos.count;i++){w.fromBufferAttribute(pos,i);const d=-w.y-tie*STEP;if(d<=0)continue;const a=Math.atan2(w.z,w.x),k=1+Math.min(1,d/(2.4*STEP))*.12*Math.sin(a*11+Math.sin(a*3)*2);pos.setXYZ(i,w.x*k,w.y-Math.max(0,d)*.15*Math.cos(a*7),w.z*k);}
+  geo.computeVertexNormals();
+  const film=new THREE.Mesh(geo,new THREE.MeshPhysicalMaterial({color:0xf3f9fc,roughness:.18,clearcoat:.8,clearcoatRoughness:.15,transparent:true,opacity:.38,side:THREE.DoubleSide,depthWrite:false}));
+  film.renderOrder=4;
+  const g=new THREE.Group();g.position.set(c.x,top,c.z);g.add(film);return g;
+}
 function buildLab5(){
   if(lab5)return true;
   if([2,3,7,12].some(n=>!rawGLB[SPEC[n].url])||CO2_PARTS.some(url=>!rawGLB[url])||!tweezersModel||!matchGLB)return false;
@@ -2828,10 +2865,7 @@ function buildLab5(){
   const film=tool(2,[2.25,0,-.35]);
   // que diêm (hiện khi đã đốt) và màng bọc phủ miệng bình 2 (đĩa mỏng hơi võng + viền ôm cổ bình)
   const match=makeMatch();match.visible=false;root.add(match);
-  const f2=flasks[1].position,filmMat=new THREE.MeshPhysicalMaterial({color:0xf4fbff,roughness:.15,transmission:.6,transparent:true,opacity:.55,side:THREE.DoubleSide,depthWrite:false});
-  const cover=new THREE.Group();cover.visible=false;cover.position.set(f2.x,mouth.y,f2.z);root.add(cover);
-  const cap=new THREE.Mesh(new THREE.SphereGeometry(mouth.r*1.25,32,8,0,Math.PI*2,0,Math.PI*.22),filmMat);cap.scale.y=.35;cover.add(cap);
-  const skirt=new THREE.Mesh(new THREE.CylinderGeometry(mouth.r*1.12,mouth.r*1.25,.16,32,1,true),filmMat);skirt.position.y=-.07;cover.add(skirt);
+  const cover=clingFilm(flasks[1]);cover.visible=false;root.add(cover);
   const S=makeSensor(root,[-2.3,0,.9]);
   const attach=flasks.map(f=>sensorAttachAt(S,f));
   const rings=[0,1].map(()=>{const r=new THREE.Mesh(new THREE.RingGeometry(.52,.6,64),new THREE.MeshBasicMaterial({color:0xd8ff64,transparent:true,opacity:.8,depthWrite:false,side:THREE.DoubleSide}));r.rotation.x=-Math.PI/2;r.position.y=.008;r.visible=false;r.renderOrder=2;root.add(r);return r;});
@@ -2861,7 +2895,8 @@ function tn2cApply(){
   L.cover.visible=tn2c.film;
   sensorLead(L,tn2cNearFlask());
   const m=tn2cMeasuring();
-  sensorScreen(L,m?`${tn2cPPM()} ppm`:'— ppm',m?`${tn2c.minutes.toFixed(1)} / 5 phút · bình ${tn2cCur()+1}`:'',tn2c.awaiting?'GHI KẾT QUẢ':tn2c.playing&&m?'ĐANG ĐO':m?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
+  const pk=tn2c.probeAt;   // chưa lắp: CO₂ không khí · đầu dò còn trong bình đã đo xong: số cuối của bình đó
+  sensorScreen(L,`${m?tn2cPPM():pk>=0?tn2cVal(pk,tn2c.records[pk].length===5?5:0):CO2_AIR} ppm`,m?`${tn2c.minutes.toFixed(1)} / 5 phút · bình ${tn2cCur()+1}`:'',tn2c.awaiting?'GHI KẾT QUẢ':tn2c.playing&&m?'ĐANG ĐO':m?'SẴN SÀNG':'CHỜ LẮP ĐẦU DÒ');
   tn2cRings();dirty=true;
 }
 const tn2cNearFlask=()=>{const L=lab5,p=L.probe.getWorldPosition(new THREE.Vector3());return L.flasks.reduce((a,f)=>f.position.distanceTo(p)<a.position.distanceTo(p)?f:a);};
