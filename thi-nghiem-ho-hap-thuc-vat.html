@@ -1393,6 +1393,9 @@ glbJobs.push(Promise.all(CO2_PARTS.map(loadGLB)).then(parts=>{ const g=new THREE
 // Nhíp gắp hạt (chỉ dùng trong Phương án 1, không thuộc 13 dụng cụ ở Bước 1 nên không nạp qua PLACE/EQUIPMENT)
 let tweezersModel=null;
 // Đĩa Pêtri có hoạt cảnh 18 s (phương án 2): 0,7–3,8 s giấy hạ vào đĩa · 4,5–7,9 s hạt rơi vào · 9,35–12,45 s giọt nước · 9,6–16,5 s vệt ẩm loang
+// Que diêm đang cháy (thí nghiệm 2c): thân que nằm ngang theo trục Z, đầu que ở phía +Z; mặt phẳng "Lua" là ngọn lửa mọc lên ở đầu que
+let matchGLB=null;
+glbJobs.push(new Promise(res=>loader.load('https://3d-cdn.yoolife.com.vn/QOm6Mjtnv1WACAmywO/QOm6Mjtnv1WACAmywO.glb',g=>{ matchGLB=g.scene; res(); },undefined,e=>{ console.warn('Không tải được GLB',e); res(); })));
 let petriGLB=null;
 glbJobs.push(new Promise(res=>loader.load('https://3d-cdn.yoolife.com.vn/1gLz9xUbNVPRomKhuO/1gLz9xUbNVPRomKhuO.glb',g=>{ petriGLB=g; res(); },undefined,e=>{ console.warn('Không tải được GLB',e); res(); })));
 glbJobs.push(loadGLB('https://3d-cdn.yoolife.com.vn/JJGhvqRcwz6lm7pkR0/JJGhvqRcwz6lm7pkR0.glb').then(obj=>{ tweezersModel=wrap(obj,{scale:REAL,rotX:-Math.PI/2,center:true}); }));   // file gốc: dài 12 cm theo +Y (đứng), đầu gắp ở y=0,12 → xoay nằm: đầu gắp hướng -Z, hai càng chồng lên nhau theo phương đứng
@@ -2771,7 +2774,7 @@ function tn2bTags(){
    ===================================================================== */
 const tn2c={active:false,hover:null,i:0,open:[false,false],seeded:[false,false],count:[0,0],lit:false,matchIn:false,film:false,minutes:0,playing:false,awaiting:false,records:[[],[]],probeAt:-1,onChange:null};
 const TN2C_START=[400,1500],TN2C_RATE=[384,160];   // ppm (minh hoạ): que diêm cháy làm CO₂ trong bình 2 cao sẵn → hạt hô hấp chậm lại, CO₂ tăng ít
-const TN2C_MATCH_REST=[.3,.17,.05];   // que diêm nằm trên lớp hạt: gốc que lệch +x, thân que (xoay quanh Z) chĩa về −x → nằm gọn giữa đáy bình
+const TN2C_MATCH_REST=[0,.16,.08];   // que diêm nằm trên lớp hạt, giữa đáy bình
 const TN2C_FINAL=9,TN2C_DRAG={1:'tweezers',2:'probe',5:'match',6:'film',7:'probe'},TN2C_CLICK={0:'cork',4:'matches'};
 let lab5=null,tn2cBusy=false,tn2cDrag=null;
 const tn2cCur=()=>tn2c.i<=3?0:1;
@@ -2784,21 +2787,21 @@ function tn2cState(){
     records:tn2c.records.map(r=>r.length),flask:tn2cCur(),busy:tn2cBusy,act:drag||click,how:drag?'drag':click?'click':'',done:tn2c.i===TN2C_FINAL};
 }
 /* que diêm: thân gỗ mảnh, đầu đỏ; ngọn lửa (hai lớp nón phát sáng) + ánh sáng cam nhấp nháy */
+/* que diêm từ model: ngọn lửa (mesh "Lua") gắn vào một trục đặt ở chân lửa để tắt dần / nhấp nháy quanh đầu que; thêm ánh sáng cam */
+const MATCH_SCALE=REAL*1.3;   // to hơn que diêm thật một chút cho dễ thấy ngọn lửa ở góc nhìn cả bàn
 function makeMatch(){
-  const g=new THREE.Group();
-  const stick=new THREE.Mesh(new THREE.CylinderGeometry(.012,.012,.42,8),mat([.86,.72,.48],.7));stick.position.y=.21;g.add(stick);
-  const head=new THREE.Mesh(new THREE.SphereGeometry(.022,12,10),mat([.55,.08,.05],.5));head.scale.set(1,1.4,1);head.position.y=.43;g.add(head);
-  const flame=new THREE.Group();flame.position.y=.47;g.add(flame);
-  const outer=new THREE.Mesh(new THREE.ConeGeometry(.045,.16,16,1,true),new THREE.MeshBasicMaterial({color:0xffa53a,transparent:true,opacity:.75,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
-  const inner=new THREE.Mesh(new THREE.ConeGeometry(.022,.09,12,1,true),new THREE.MeshBasicMaterial({color:0xfff2b0,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
-  outer.position.y=.07;inner.position.y=.04;flame.add(outer,inner);
-  const light=new THREE.PointLight(0xffa040,0,2.2,1.5);light.position.y=.08;flame.add(light);
-  g.scale.setScalar(1.5);   // to hơn que diêm thật một chút cho dễ thấy ngọn lửa ở góc nhìn cả bàn
-  g.userData={flame,light,head};g.traverse(o=>{if(o.isMesh)o.castShadow=false;});return g;
+  const g=new THREE.Group();g.rotation.order='YXZ';   // xoay quanh trục đứng sau cùng: nghiêng đầu que lên rồi mới quay hướng que
+  const m=matchGLB.clone(true);m.scale.setScalar(MATCH_SCALE);g.add(m);g.updateMatrixWorld(true);
+  let lua=null;m.traverse(o=>{if(o.isMesh){o.castShadow=false;if(/lua/i.test(o.material?.name||'')){lua=o;o.material=o.material.clone();o.material.depthWrite=false;o.renderOrder=4;}}});
+  const flame=new THREE.Group();g.add(flame);
+  if(lua){const b=new THREE.Box3().setFromObject(lua),c=b.getCenter(new THREE.Vector3());flame.position.set(c.x,b.min.y,c.z);flame.attach(lua);}
+  const light=new THREE.PointLight(0xffa040,0,2.2,1.5);light.position.y=.12;flame.add(light);
+  g.userData={flame,light};return g;
 }
+const MATCH_HELD=[-.35,Math.PI/2,0],MATCH_LYING=[0,.5,0];   // cầm: que hướng sang phải, đầu que chếch lên · nằm: que nằm ngang trên lớp hạt
 function buildLab5(){
   if(lab5)return true;
-  if([2,3,7,12].some(n=>!rawGLB[SPEC[n].url])||CO2_PARTS.some(url=>!rawGLB[url])||!tweezersModel)return false;
+  if([2,3,7,12].some(n=>!rawGLB[SPEC[n].url])||CO2_PARTS.some(url=>!rawGLB[url])||!tweezersModel||!matchGLB)return false;
   const root=new THREE.Group();scene.add(root);
   const tool=(n,pos,opt={})=>{const g=wrap(rawGLB[SPEC[n].url].clone(true),{...SPEC[n],center:true,...opt});g.position.set(...pos);root.add(g);shadowsFor(g);return g;};
   const flasks=[[-1.4,0,-.5],[.9,0,-.5]].map(p=>{const f=tool(3,p);f.traverse(o=>{if(o.isMesh&&o.material===glass){o.material=glassThin;o.renderOrder=3;}});return f;});
@@ -2840,7 +2843,7 @@ function tn2cCorkTo(k,open,anim,onDone){
   if(c.parent!==par)par.attach(c);
   if(anim)animateTo(c,to.toArray(),.55,onDone,.45);else{c.position.copy(to);c.rotation.set(0,0,0);}
 }
-function tn2cMatchFlame(on){const u=lab5.match.userData;u.flame.visible=on;u.light.intensity=on?1.6:0;u.head.material=on?mat([.15,.12,.1],.9):u.head.material;}
+function tn2cMatchFlame(on){const u=lab5.match.userData;u.flame.visible=on;u.light.intensity=on?1.6:0;if(on)u.flame.scale.setScalar(Math.max(u.flame.scale.x,.2));}
 function tn2cApply(){
   const L=lab5;if(!L)return;
   if(!tn2cBusy&&!tn2cDrag){
@@ -2851,8 +2854,8 @@ function tn2cApply(){
     L.probe.rotation.set(at?-Math.PI/2:0,0,0);L.probe.position.copy(at||L.probeHome);
     // que diêm: đang cầm trên hộp diêm (đã đốt) · nằm trong đáy bình 2 (đã thả, đã tắt)
     L.match.visible=tn2c.lit||tn2c.matchIn;
-    if(tn2c.matchIn){const f=L.flasks[1].position;L.match.position.set(f.x+TN2C_MATCH_REST[0],TN2C_MATCH_REST[1],f.z+TN2C_MATCH_REST[2]);L.match.rotation.set(0,.25,1.42);tn2cMatchFlame(false);}
-    else if(tn2c.lit){L.match.position.copy(L.matchHome);L.match.rotation.set(0,0,-.25);tn2cMatchFlame(true);}
+    if(tn2c.matchIn){const f=L.flasks[1].position;L.match.position.set(f.x+TN2C_MATCH_REST[0],TN2C_MATCH_REST[1],f.z+TN2C_MATCH_REST[2]);L.match.rotation.set(...MATCH_LYING);tn2cMatchFlame(false);}
+    else if(tn2c.lit){L.match.position.copy(L.matchHome);L.match.rotation.set(...MATCH_HELD);tn2cMatchFlame(true);}
   }
   L.piles.forEach((g,k)=>{g.visible=tn2c.count[k]>0;const n=Math.round(g.children.length*tn2c.count[k]/TN2A_TRIPS);g.children.forEach((c,j)=>c.visible=j<n);});
   L.cover.visible=tn2c.film;
@@ -2914,7 +2917,7 @@ function tn2cDo(){
   }
   else if(i===4){
     // quẹt diêm: que diêm nhô lên từ hộp, bùng lửa
-    busy();tn2c.lit=true;const mt=L.match;mt.visible=true;mt.position.copy(L.matches.position).setY(.1);mt.rotation.set(0,0,-.25);tn2cMatchFlame(true);
+    busy();tn2c.lit=true;const mt=L.match;mt.visible=true;mt.position.copy(L.matches.position).setY(.1);mt.rotation.set(...MATCH_HELD);tn2cMatchFlame(true);
     mt.userData.flame.scale.setScalar(.2);
     animateTo(mt,L.matchHome.toArray(),.45,()=>tn2cFinish('Que diêm đã cháy. Kéo que diêm thả vào bình 2.'),.15);
   }
@@ -2922,8 +2925,8 @@ function tn2cDo(){
     // thả que diêm đang cháy qua miệng bình 2: rơi xuống đáy, lửa yếu dần rồi tắt (thiếu O₂, sinh CO₂)
     busy();const mt=L.match,f=L.flasks[1].position;
     animateTo(mt,[f.x,L.mouth.y+.15,f.z],.5,()=>{
-      mt.rotation.set(0,0,0);tn2c.matchIn=true;tn2c.lit=false;
-      animateTo(mt,[f.x+TN2C_MATCH_REST[0],TN2C_MATCH_REST[1],f.z+TN2C_MATCH_REST[2]],.45,()=>{mt.rotation.set(0,.25,1.42);L.flow={t:0,dur:1.6,step:p=>{const fl=mt.userData.flame;fl.scale.setScalar(Math.max(.001,1-p));mt.userData.light.intensity=1.6*(1-p);},done:()=>{tn2cMatchFlame(false);tn2cFinish('Que diêm rơi vào bình 2 và tắt dần. Đậy nhanh miệng bình bằng màng bọc!');}};},0);
+      mt.rotation.set(...MATCH_LYING);tn2c.matchIn=true;tn2c.lit=false;
+      animateTo(mt,[f.x+TN2C_MATCH_REST[0],TN2C_MATCH_REST[1],f.z+TN2C_MATCH_REST[2]],.45,()=>{mt.rotation.set(...MATCH_LYING);L.flow={t:0,dur:1.6,step:p=>{const fl=mt.userData.flame;fl.scale.setScalar(Math.max(.001,1-p));mt.userData.light.intensity=1.6*(1-p);},done:()=>{tn2cMatchFlame(false);tn2cFinish('Que diêm rơi vào bình 2 và tắt dần. Đậy nhanh miệng bình bằng màng bọc!');}};},0);
     },.3);
   }
   else if(i===6){
