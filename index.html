@@ -3433,9 +3433,29 @@ function toolObjs(){
   return [];
 }
 let fitCache={k:'',r:null};
+/* điểm nhìn + khoảng cách để mọi điểm pts nằm trong khung (hướng nhìn fwd/right/up cố định, chừa lề 10%) */
+function fitPoints(pts,T,fwd,right,up,aspect,fx){
+  if(!pts.length) return null;
+  const tan=1/2.7,m=.9;
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  pts.forEach(p=>{ const q=p.clone().sub(T),x=q.dot(right),y=q.dot(up); x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); });
+  const t=T.clone().addScaledVector(right,(x0+x1)/2).addScaledVector(up,(y0+y1)/2);
+  let d=0; pts.forEach(p=>{ const q=p.clone().sub(t),z=q.dot(fwd); d=Math.max(d,Math.abs(q.dot(right))/(tan*aspect*fx*m)-z,Math.abs(q.dot(up))/(tan*m)-z); });
+  return {t:t.toArray(),d};
+}
+/* bàn chuẩn bị, toàn cảnh: khung đủ 14 dụng cụ và chấm số phía trên (tính lại khi đổi cỡ màn hình hoặc số dụng cụ) */
+let prepFitCache={k:'',r:null};
+function prepFit(aspect){
+  const vis=draggables.filter(g=>shown(g)),k=aspect.toFixed(3)+'|'+vis.length; if(prepFitCache.k===k) return prepFitCache.r;   // mô hình tải xong mới có đủ dụng cụ: tính lại
+  const V=THREE.Vector3,T=new V(...TARGETS[0]),fwd=new V(0,-Math.sin(PREP_PITCH),-Math.cos(PREP_PITCH)),right=new V(1,0,0),up=new V().crossVectors(right,fwd),pts=[];
+  vis.forEach(g=>{ const b=new THREE.Box3().setFromObject(g); if(b.isEmpty()) return;
+    b.max.y+=.55;   // chừa chỗ cho chấm số nổi trên dụng cụ
+    for(let i=0;i<8;i++) pts.push(new V(i&1?b.max.x:b.min.x,i&2?b.max.y:b.min.y,i&4?b.max.z:b.min.z)); });
+  prepFitCache={k,r:fitPoints(pts,T,fwd,right,up,aspect,1)}; return prepFitCache.r;
+}
 function presetFit(ps,aspect,fx){
   if(userDragging()&&fitCache.r) return fitCache.r;   // đang kéo vật: giữ yên khung
-  const V=THREE.Vector3,R=PRESET_REF,tan=1/2.7,step=pa1.active?pa1.i:pa2.active?pa2.i:tn2a.active?tn2a.i:tn2b.active?tn2b.i:tn2c.active?tn2c.i:'';
+  const V=THREE.Vector3,R=PRESET_REF,step=pa1.active?pa1.i:pa2.active?pa2.i:tn2a.active?tn2a.i:tn2b.active?tn2b.i:tn2c.active?tn2c.i:'';
   const rings=((activeLab()||{}).rings||[]).filter(g=>g.visible).map(g=>g.getWorldPosition(new V()));   // vật cần kéo / chỗ cần thả của thao tác luôn nằm trong khung
   const key=[presetKey,step,aspect.toFixed(3),fx.toFixed(3),...rings.map(c=>c.x.toFixed(1)+','+c.z.toFixed(1))].join('|');
   if(fitCache.k===key) return fitCache.r;
@@ -3457,14 +3477,7 @@ function presetFit(ps,aspect,fx){
     if(!pb.isEmpty()){ const c=pb.getCenter(new V()); pts.push(pb.min.clone(),pb.max.clone(),new V(c.x-.45,0,c.z-.45),new V(c.x+.45,0,c.z+.45)); }   // ±0,45: thân bình dưới đầu dò
   }
   rings.forEach(c=>pts.push(c.clone().add(new V(-.45,0,-.45)),c.clone().add(new V(.45,.5,.45))));
-  let r=null;
-  if(pts.length){
-    let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
-    pts.forEach(p=>{ const q=p.clone().sub(T),x=q.dot(right),y=q.dot(up); x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); });
-    const t=T.clone().addScaledVector(right,(x0+x1)/2).addScaledVector(up,(y0+y1)/2),m=.9;   // m: chừa lề 10%
-    let d=0; pts.forEach(p=>{ const q=p.clone().sub(t),z=q.dot(fwd); d=Math.max(d,Math.abs(q.dot(right))/(tan*aspect*fx*m)-z,Math.abs(q.dot(up))/(tan*m)-z); });
-    r={t:t.toArray(),d:Math.max(d,ps.d*.8)};
-  }
+  let r=fitPoints(pts,T,fwd,right,up,aspect,fx); if(r) r.d=Math.max(r.d,ps.d*.8);
   if(fitCache.r&&r&&(fitCache.r.d!==r.d||fitCache.r.t+''!==r.t+'')){ tween=true; camSlow=true; }   // sang thao tác mới: khung lại từ từ
   fitCache={k:key,r}; return r;
 }
@@ -3500,8 +3513,12 @@ function computeWant0(){
   const bc=(lab1||bench)&&!under?benchCam(aspect):null;
   if(bc){ want.target.set(...bc.t); want.eye.set(bc.t[0]+Math.sin(yaw)*Math.cos(pitch)*bc.d,bc.t[1]+Math.sin(pitch)*bc.d,bc.t[2]+Math.cos(yaw)*Math.cos(pitch)*bc.d); return; }
   const o=lab1||bench?[0,0,0]:offsetOf(focus),t=pa2.active?[innerWidth>820?.55:-.4,.45,.2]:tn2a.active||tn2b.active||tn2c.active?[innerWidth>820?.35:-.6,.55,.3]:lab1?PA1_VIEW.t:TARGETS[focus];
-  const dist=distance*(bench?.65:lab1?PA1_VIEW.fd:FOCUS_DIST[focus])*Math.max(1,(focus?.65:1.05)/aspect);
+  let dist=distance*(bench?.65:lab1?PA1_VIEW.fd:FOCUS_DIST[focus])*Math.max(1,(focus?.65:1.05)/aspect);
   want.target.set(t[0]+o[0],t[1],t[2]+o[2]);   // chỉ theo dịch chuyển ngang
+  if(!lab1&&!bench&&!focus&&!under&&aspect<1.3){   // điện thoại / màn hẹp: lùi xa cho thấy đủ 14 dụng cụ ở bàn chuẩn bị
+    const f=prepFit(aspect),fd=f&&f.d*distance/16.5;
+    if(f&&fd>dist){ dist=fd; want.target.set(...f.t); }
+  }
   want.eye.set(want.target.x+Math.sin(yaw)*Math.cos(pitch)*dist,want.target.y+Math.sin(pitch)*dist,want.target.z+Math.cos(yaw)*Math.cos(pitch)*dist);
 }
 function render(){
