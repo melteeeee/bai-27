@@ -3329,9 +3329,9 @@ const BENCH_ALL={
 }
 const BC={on:false,t:new THREE.Vector3(),w:7,h:3.6,pitch:.34,touched:false,step:'',busy:false,last:null,zoom:null};
 let camTouched=false,camDt=0,actFocus=null;   // camTouched: học sinh vừa tự xoay / zoom
-/* DEBUG góc nhìn: bật mặc định (tắt bằng index.html?nodebug). Camera tự do ở mọi cảnh: không tự kéo về khung bước,
+/* DEBUG góc nhìn: tắt mặc định, mở index.html?debug để bật. Camera tự do ở mọi cảnh: không tự kéo về khung bước,
    góc ngẩng / khoảng cách gần như không giới hạn, chuột phải hoặc Shift + kéo để dịch điểm nhìn. */
-const CAM_FREE=!/[?&]nodebug\b/.test(location.search),camPan=new THREE.Vector3();
+const CAM_FREE=/[?&]debug\b/.test(location.search),camPan=new THREE.Vector3();
 const PMIN=()=>CAM_FREE?-1.5:under?-.95:-.16,PMAX=CAM_FREE?1.5:1.08,DMIN=CAM_FREE?1:4.9,DMAX=CAM_FREE?80:23;
 let camPanMode=false,camScene='';
 function activeLab(){ return pa1.active?lab:pa2.active?lab2:tn2a.active?lab3:tn2b.active?lab4:tn2c.active?lab5:null; }
@@ -3544,8 +3544,8 @@ function stepPhysics(dt){
   return moving;
 }
 let last=performance.now();
-/* DEBUG: bảng mã góc nhìn, hiện mặc định — mở index.html?nodebug để ẩn. Bấm vào bảng để sao chép. */
-const camDbg=document.createElement('pre');camDbg.style.cssText='position:fixed;left:8px;top:136px;z-index:9999;margin:0;padding:8px 10px;background:#000c;color:#9f6;font:12px/1.4 monospace;border-radius:8px;cursor:pointer;pointer-events:auto;white-space:pre';camDbg.hidden=!CAM_FREE;document.body.appendChild(camDbg);   // tắt bằng ?nodebug
+/* DEBUG: bảng mã góc nhìn, ẩn mặc định — mở index.html?debug để hiện. Bấm vào bảng để sao chép. */
+const camDbg=document.createElement('pre');camDbg.style.cssText='position:fixed;left:8px;top:136px;z-index:9999;margin:0;padding:8px 10px;background:#000c;color:#9f6;font:12px/1.4 monospace;border-radius:8px;cursor:pointer;pointer-events:auto;white-space:pre';camDbg.hidden=!CAM_FREE;document.body.appendChild(camDbg);   // chỉ hiện khi mở trang với ?debug
 addEventListener('keydown',e=>{ if(CAM_FREE&&e.key==='1'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.target.closest?.('input,textarea,select,[contenteditable]')){ camDbg.hidden=!camDbg.hidden; } });   // phím 1: tạm ẩn / hiện bảng debug
 camDbg.onclick=()=>{navigator.clipboard?.writeText(camDbg.textContent);camDbg.style.color='#ff6';setTimeout(()=>camDbg.style.color='#9f6',400);};
 let camDbgT=0;
