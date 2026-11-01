@@ -677,7 +677,7 @@ function renderStep0(){
 /* ---------- Thí nghiệm 1 · Phương án 1: học sinh thao tác trên bàn 3D ---------- */
 const GRAB_TARGET=window.GRAB_TARGET=6;   // số hạt cần gắp lần lượt bằng nhíp vào túi vải 1 (module 3D đọc lại qua window)
 const PA1_TEXT={
-  seed:{b:2,ttl:'Cho hạt nảy mầm vào túi vải',gd:`Hai bình tam giác đã có sẵn <span class="b">50 ml nước vôi trong</span> (bước 1) — rê chuột hoặc chạm vào dụng cụ để xem tên. Kéo <span class="b">nhíp gắp</span> tới <span class="b">đĩa hạt đậu xanh nảy mầm</span> để gắp một hạt, rồi kéo nhíp tới <span class="b">túi vải 1</span> và thả tay để thả hạt vào túi. Lặp lại cho đến khi đủ ${GRAB_TARGET} hạt.`,how:'drag'},
+  seed:{b:2,ttl:'Cho hạt nảy mầm vào túi vải',gd:`Hai bình tam giác đã có sẵn <span class="b">50 ml nước vôi trong</span> (bước 1) — rê chuột hoặc chạm vào dụng cụ để xem tên. Kéo <span class="b">nhíp gắp</span> tới <span class="b">đĩa hạt đậu xanh nảy mầm</span> rồi thả tay: nhíp sẽ tự gắp lần lượt ${GRAB_TARGET} hạt bỏ vào <span class="b">túi vải 1</span>.`,how:'drag'},
   open1:{b:2,ttl:'Mở nút cao su bình 1',gd:'Kéo <span class="b">nút cao su</span> của bình 1 nhấc ra, đặt xuống bàn.',how:'drag'},
   bag1:{b:2,ttl:'Đặt túi hạt vào bình 1',gd:'Kéo <span class="b">túi vải có hạt</span> tới miệng <span class="b">bình 1</span> rồi thả tay. Túi được treo sao cho đáy túi <span class="b">không chạm</span> mặt nước vôi trong.',how:'drag'},
   close1:{b:2,ttl:'Đậy kín bình 1',gd:'Kéo <span class="b">nút cao su</span> trên bàn đặt lại vào miệng bình 1, đảm bảo <span class="b">kín khí</span>.',how:'drag'},
@@ -1635,7 +1635,7 @@ function stepAnims(dt){
 /* =====================================================================
    THÍ NGHIỆM 1 · PHƯƠNG ÁN 1 — tương tác trên bàn
    Bàn chỉ còn: 2 bình tam giác (đã có 50 ml nước vôi trong), đĩa hạt nảy mầm, nhíp gắp, 2 túi vải.
-   Thao tác: kiểm tra bình → dùng nhíp gắp từng hạt từ đĩa thả vào túi 1 (lặp lại GRAB_TARGET lần) → nhấc nút, thả túi, đậy nút (bình 1, rồi bình 2 với túi rỗng)
+   Thao tác: kiểm tra bình → kéo nhíp tới đĩa, nhíp tự gắp từng hạt thả vào túi 1 (đủ GRAB_TARGET hạt) → nhấc nút, thả túi, đậy nút (bình 1, rồi bình 2 với túi rỗng)
    → tua nhanh 2 giờ (nước vôi bình 1 đục dần) → phiếu số 1.
    Bước 2 có vật lý: hạt rơi theo trọng lực vào túi, nút cao su rơi/nảy trên bàn, túi rơi qua cổ bình và đung đưa theo dây.
    ===================================================================== */
@@ -1860,7 +1860,7 @@ function pa1Rings(){
 function pa1Next(msg){ pa1.i=Math.min(PA1_ORDER.length-1,pa1.i+1); pa1Rings(); pa1Emit(msg); }
 let pa1Busy=false;      // đang chạy một chuỗi vật lý (đổ hạt / túi rơi / nút rơi)
 
-/* ---- nhíp gắp: hạ xuống đĩa gắp MỘT hạt, bay tới túi, thả rơi vào túi — lặp lại GRAB_TARGET lần ---- */
+/* ---- nhíp gắp: hạ xuống đĩa gắp MỘT hạt, bay tới túi, thả rơi vào túi — tự lặp lại đủ GRAB_TARGET lần sau một lần kéo ---- */
 /* vị trí mũi nhíp (điểm kẹp) so với tâm nhíp khi nhíp nghiêng góc a quanh trục X (a<0: mũi chúc xuống) */
 function tipOffset(a){ const g=lab.spoon.userData.pile.position; return [g.y*Math.cos(a)-g.z*Math.sin(a),g.y*Math.sin(a)+g.z*Math.cos(a)]; }
 const TW_DIP=-1.2,TW_CARRY=-1.05,TW_HOLD=1.0;   // góc chúc mũi khi gắp; góc cầm khi mang hạt (tay cầm hướng lên trên); độ cao tâm nhíp khi đang kẹp hạt
@@ -1876,7 +1876,7 @@ function scoopSeeds(auto){
     animateTo(sp,[d.position.x+.8,TW_HOLD,d.position.z-hz+.1],.45,()=>{
       sp.userData.scripted=false; sp.userData.lift=TW_HOLD; sp.userData.tilt=TW_CARRY; sp.userData.rx=TW_CARRY;   // giữ ở độ cao cầm tay, không rơi xuống bàn khi còn kẹp hạt
       pa1Busy=false; pa1Rings();
-      pa1Emit({ok:'Đã gắp một hạt nảy mầm bằng nhíp.'});
+      pa1Emit(auto?null:{ok:'Đã gắp một hạt nảy mầm bằng nhíp.'});   // tự gắp liên tục: không báo từng lần kẹp
       if(auto) pa1Do();
     },.12,TW_CARRY);
   },.15,TW_DIP);
@@ -1911,6 +1911,7 @@ function stepSpoonPour(dt){
     L.spoonPour=null; L.seeds.length=0; pa1Busy=false; sp.userData.scripted=false; wake(b);
     pa1.grabCount=(pa1.grabCount||0)+1;
     const done=pa1.grabCount>=GRAB_TARGET;
+    if(!done&&pa1.active){ pa1Emit({ok:`Đã thả hạt thứ ${pa1.grabCount} vào túi (${pa1.grabCount}/${GRAB_TARGET}).`}); scoopSeeds(true); return true; }   // chưa đủ hạt: nhíp tự quay lại đĩa gắp tiếp
     animateTo(sp,sp.userData.home.toArray(),.5,()=>{
       if(done){ pa1.seeded=true; pa1Next({ok:`Đã gắp đủ ${GRAB_TARGET} hạt nảy mầm vào túi vải 1.`}); }
       else{ pa1Rings(); pa1Emit({ok:`Đã thả hạt thứ ${pa1.grabCount} vào túi (${pa1.grabCount}/${GRAB_TARGET}).`}); }
@@ -2080,7 +2081,7 @@ function pa1CanDrag(g){
 function pa1Drop(g){
   const L=lab,a=pa1Action(),near=(t,r)=>Math.hypot(g.position.x-t.position.x,g.position.z-t.position.z)<r;
   if(a==='seed'&&g===L.spoon){
-    if(!pa1.scooped&&near(L.dish,1.05)){ scoopSeeds(false); return; }
+    if(!pa1.scooped&&near(L.dish,1.05)){ scoopSeeds(true); return; }   // kéo nhíp tới đĩa một lần: nhíp tự gắp lần lượt đủ hạt bỏ vào túi
     if(pa1.scooped&&near(L.bag[0],1.05)){ startPourSpoon(); return; }
     animateTo(g,g.userData.home.toArray(),.4); pa1Emit({warn:pa1Hint()}); return;
   }
@@ -2088,7 +2089,7 @@ function pa1Drop(g){
   animateTo(g,g.userData.home.toArray(),.4); pa1Emit({warn:pa1Hint()});
 }
 function pa1Hint(){
-  return {seed:pa1.scooped?'Kéo nhíp tới túi vải 1 rồi thả tay để thả hạt vào túi.':`Kéo nhíp tới đĩa hạt nảy mầm rồi thả tay để gắp một hạt (đã gắp ${pa1.grabCount||0}/${GRAB_TARGET}).`,open1:'Kéo nút cao su của bình 1 nhấc ra, đặt xuống bàn.',bag1:'Kéo túi vải có hạt tới miệng bình 1 rồi thả tay.',close1:'Kéo nút cao su trên bàn đặt lại vào miệng bình 1.',open2:'Kéo nút cao su của bình 2 nhấc ra, đặt xuống bàn.',bag2:'Kéo túi vải rỗng tới miệng bình 2 rồi thả tay.',close2:'Kéo nút cao su trên bàn đặt lại vào miệng bình 2.',wait:'Bấm Tua nhanh để quan sát sau 1 – 2 giờ.',sheet:'Hoàn thiện phiếu số 1.'}[pa1Action()];
+  return {seed:pa1.scooped?'Kéo nhíp tới túi vải 1 rồi thả tay để thả hạt vào túi.':`Kéo nhíp tới đĩa hạt nảy mầm rồi thả tay: nhíp sẽ tự gắp đủ ${GRAB_TARGET} hạt vào túi vải 1.`,open1:'Kéo nút cao su của bình 1 nhấc ra, đặt xuống bàn.',bag1:'Kéo túi vải có hạt tới miệng bình 1 rồi thả tay.',close1:'Kéo nút cao su trên bàn đặt lại vào miệng bình 1.',open2:'Kéo nút cao su của bình 2 nhấc ra, đặt xuống bàn.',bag2:'Kéo túi vải rỗng tới miệng bình 2 rồi thả tay.',close2:'Kéo nút cao su trên bàn đặt lại vào miệng bình 2.',wait:'Bấm Tua nhanh để quan sát sau 1 – 2 giờ.',sheet:'Hoàn thiện phiếu số 1.'}[pa1Action()];
 }
 function pa1Enter(){
   if(pa1.active) return true;
