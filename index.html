@@ -1432,7 +1432,7 @@ const SPEC={
   10:{url:'https://3d-cdn.yoolife.com.vn/EOops2z3CUtBonBgGV/EOops2z3CUtBonBgGV.glb',scale:REAL,thin:true},   // cốc nước vôi trong
   11:{url:'https://3d-cdn.yoolife.com.vn/G19XiNoHkrcceCrVqb/G19XiNoHkrcceCrVqb.glb',scale:.76,center:true},  // bình nhựa (gốc ở giữa thân)
   12:{url:'https://3d-cdn.yoolife.com.vn/IUGn_c4Ev3y1rHdcbb/IUGn_c4Ev3y1rHdcbb.glb',scale:REAL},             // đĩa hạt đậu nảy mầm
-  13:{url:'https://3d-cdn.yoolife.com.vn/ftEyW9kVKygNc02HWQ/ftEyW9kVKygNc02HWQ.glb',scale:REAL},             // đĩa hạt đậu xanh
+  13:{url:'https://3d-cdn.yoolife.com.vn/ftEyW9kVKygNc02HWQ/ftEyW9kVKygNc02HWQ.glb',scale:REAL,clearSeedDish:true},             // đĩa hạt đậu xanh
 };
 const CO2_PARTS=['https://3d-cdn.yoolife.com.vn/eH995bfxR7MEu6Azsg/eH995bfxR7MEu6Azsg.glb',   // máy đo CO₂ · màn hình
   'https://3d-cdn.yoolife.com.vn/gqvZ8zw-LN12qjVtlj/gqvZ8zw-LN12qjVtlj.glb',                    //               · đầu dò
@@ -1500,6 +1500,8 @@ const limeWater=new THREE.MeshPhysicalMaterial({color:lin(.5,.72,.74),roughness:
 // Thìa thuỷ tinh: kính trong, hai mặt để nhìn rõ lòng thìa và hạt bên trong
 const spoonGlass=new THREE.MeshPhysicalMaterial({color:lin(.92,.99,.96),roughness:.035,metalness:0,transmission:1,thickness:.16,ior:1.5,
   attenuationColor:lin(.62,.88,.82),attenuationDistance:.55,clearcoat:1,clearcoatRoughness:.03,specularIntensity:1,envMapIntensity:2.4,side:THREE.DoubleSide});
+// Đĩa hạt chỉ dùng kính mỏng: bỏ khúc xạ gây ảnh hạt mờ lặp lại ở đáy.
+const seedDishGlass=new THREE.MeshPhysicalMaterial({color:0xffffff,transparent:true,opacity:.12,depthWrite:false,roughness:.08,metalness:0,clearcoat:.25,envMapIntensity:.7});
 const DARK=mat([.13,.17,.18],.35,.5);
 function canvasTexture(w,h,draw){ const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t; }
 
@@ -1558,7 +1560,7 @@ function addItem(n,obj,pos){
   scene.add(g); (items[n]=items[n]||[]).push(g); draggables.push(g); dirty=true;   // vẽ lại ngay khi từng dụng cụ tải xong, không chờ tải xong hết mới hiện (món nặng sẽ không kéo theo cả bàn trống lâu)
   return g;
 }
-function shadowsFor(obj){ obj.traverse(o=>{ if(o.isMesh){ const tr=o.material&&o.material.transmission>0; o.castShadow=!tr&&!o.material.transparent; o.receiveShadow=true; } }); }
+function shadowsFor(obj){ obj.traverse(o=>{ if(o.isMesh){ const tr=o.material&&o.material.transmission>0; o.castShadow=!tr&&!o.material.transparent; o.receiveShadow=!o.userData.clearSeedDish; } }); }
 /* ---------------- nạp GLB ---------------- */
 // Kính ở mọi file dùng chung một vật liệu để các dụng cụ thuỷ tinh trông thống nhất; thin → kính mỏng + nước trong
 function matFor(m,thin){
@@ -1575,9 +1577,15 @@ function loadGLB(url){
   return glbCache[url].then(o=>o.clone(true));
 }
 /* bọc model: phóng, xoay, đặt đáy chạm mặt bàn (và đưa tâm về gốc nếu cần) */
-function wrap(model,{scale=1,rotX=0,rotY=0,rotZ=0,center=false,thin=false}={}){
+function wrap(model,{scale=1,rotX=0,rotY=0,rotZ=0,center=false,thin=false,clearSeedDish=false}={}){
   const w=new THREE.Group(); model.scale.multiplyScalar(scale); model.rotation.set(rotX,rotY,rotZ); w.add(model);
-  model.traverse(o=>{ if(o.isMesh) o.material=matFor(o.material,thin); });
+  model.traverse(o=>{ if(o.isMesh){
+    o.material=matFor(o.material,thin);
+    if(clearSeedDish&&(o.material===glass||o.material===glassThin)){
+      o.material=seedDishGlass;o.userData.clearSeedDish=true;
+      o.receiveShadow=false;o.castShadow=false;o.renderOrder=3;
+    }
+  } });
   w.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(model);
   model.position.y-=b.min.y; if(center){ model.position.x-=(b.min.x+b.max.x)/2; model.position.z-=(b.min.z+b.max.z)/2; }
   return w;
@@ -2904,7 +2912,14 @@ function tn2bCorkTo(k,open,anim,onDone){
   if(c.parent!==par)par.attach(c);
   if(anim)animateTo(c,to.toArray(),.55,onDone,.45);else{c.position.copy(to);c.rotation.set(0,0,0);}
 }
-const tn2bBeakerLevel=()=>.5-.16*tn2b.water.filter((w,k)=>k&&w>0).length+(tn2b.drained?.14:0);   // nước còn trong cốc (đơn vị chiều cao)
+// Cốc chuẩn bị đủ hai phần nước: bình 2 lấy một nửa, bình 3 lấy phần còn lại.
+// Gạn bình 2 về cốc thì hoàn lại đúng phần đã rót, không tạo thêm nước.
+const TN2B_BEAKER_FULL=.5,TN2B_BEAKER_PORTION=TN2B_BEAKER_FULL/2;
+const tn2bBeakerLevel=()=>Math.max(0,TN2B_BEAKER_FULL-TN2B_BEAKER_PORTION*(tn2b.water[1]+tn2b.water[2]));
+function tn2bSetBeakerLevel(level){
+  lab4.beakerWater.visible=level>1e-4;
+  lab4.beakerWater.scale.y=Math.max(.0001,level);
+}
 /* đặt mọi thứ theo trạng thái (không đụng vật đang kéo / đang chạy hoạt cảnh) */
 function tn2bApply(){
   const L=lab4;if(!L)return;
@@ -2916,7 +2931,7 @@ function tn2bApply(){
     const at=tn2b.probeAt>=0?L.attach[tn2b.probeAt]:null;
     L.probe.rotation.set(at?-Math.PI/2:0,0,0);L.probe.position.copy(at||L.probeHome);
     L.waters.forEach((w,k)=>{w.scale.y=Math.max(.001,tn2b.water[k]);w.visible=tn2b.water[k]>0;});
-    L.beakerWater.scale.y=tn2bBeakerLevel();
+    tn2bSetBeakerLevel(tn2bBeakerLevel());
   }
   L.piles.forEach((g,k)=>g.visible=tn2b.seeded[k]);
   showSeedFraction(L.stockSeeds,1-tn2b.seeded.filter(Boolean).length/3);
@@ -2955,9 +2970,9 @@ function tn2bHint(){
 function tn2bFinish(msg){tn2bBusy=false;tn2b.i++;tween=true;tn2bApply();tn2bEmit({ok:msg});}
 /* dòng nước + mực nước thay đổi đều trong dur giây (đổ từ cốc vào bình, hoặc gạn từ bình ra cốc) */
 function tn2bFlow(k,to,dur,from,toPt,onDone){
-  const L=lab4,w=L.waters[k],start=tn2b.water[k],b0=L.beakerWater.scale.y,b1=b0+(start-to)*.16+(to===0?-.02:0);
+  const L=lab4,w=L.waters[k],start=tn2b.water[k],b0=L.beakerWater.visible?L.beakerWater.scale.y:0,b1=Math.max(0,Math.min(TN2B_BEAKER_FULL,b0+(start-to)*TN2B_BEAKER_PORTION));
   w.visible=true;L.stream.visible=true;L.stream.position.copy(from);L.stream.scale.y=Math.max(.05,from.y-toPt.y);
-  L.flow={t:0,dur,step:f=>{tn2b.water[k]=start+(to-start)*f;w.scale.y=Math.max(.001,tn2b.water[k]);L.beakerWater.scale.y=b0+(b1-b0)*f;},done:()=>{L.stream.visible=false;w.visible=tn2b.water[k]>0;onDone();}};
+  L.flow={t:0,dur,step:f=>{tn2b.water[k]=start+(to-start)*f;w.scale.y=Math.max(.001,tn2b.water[k]);tn2bSetBeakerLevel(b0+(b1-b0)*f);},done:()=>{L.stream.visible=false;w.visible=tn2b.water[k]>0;onDone();}};
 }
 /* thực hiện thao tác hiện tại (học sinh làm đúng, hoặc bấm "Làm nhanh") */
 function tn2bDo(k){
