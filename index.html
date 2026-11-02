@@ -269,6 +269,7 @@ button:focus-visible,a:focus-visible,.pin:focus-visible{outline:3px solid #2B7FD
   .sheet-wrap{position:static;display:block!important;overflow:visible;background:#fff;padding:0}
   .sheet-paper{box-shadow:none;padding:0}
   .sheet-sec{break-inside:avoid}
+  .mini canvas,.chartbox canvas{height:auto!important}
 }
 
 /* ---------- 10. Máy tính bảng ---------- */
@@ -838,8 +839,7 @@ function openP2(row){
     <p class="modal-msg" id="p2mMsg" role="alert"></p>
     ${done?`<div class="modal-act"><button type="button" class="btn alt" id="p2mBack">Quan sát lại</button><button type="button" class="btn" id="p2mSubmit">Nộp phiếu ${ICON.next}</button></div>`:''}
   </div>`;
-  md.dataset.recording='co2'; md.hidden=false; wireFields(md); drawChart();
-  requestAnimationFrame(drawChart);
+  md.dataset.recording='co2'; md.hidden=false; wireFields(md); drawChartsSoon();
   const cell=row&&md.querySelector(`[data-key="p2-min-${row}"]`);
   if(cell){ cell.closest('tr').classList.add('now'); cell.focus(); } else md.querySelector('input,textarea').focus();
   $('p2mBack').onclick=()=>{ md.hidden=true; if(step===1&&ex===1) renderPA2(); };
@@ -876,8 +876,7 @@ function openP3(id,col,row){
     <p class="modal-msg" id="p3Msg" role="alert"></p>
     ${done?`<div class="modal-act"><button type="button" class="btn alt" id="p3Back">Quan sát lại</button><button type="button" class="btn" id="p3Submit">Nộp phiếu ${ICON.next}</button></div>`:''}
   </div>`;
-  md.dataset.recording='co2'; md.hidden=false; wireFields(md); drawMinis();
-  requestAnimationFrame(drawMinis);
+  md.dataset.recording='co2'; md.hidden=false; wireFields(md); drawChartsSoon();
   const cell=col&&row&&md.querySelector(`[data-key="p3${id}-b${col}-min-${row}"]`);
   if(cell){ cell.classList.add('now'); cell.focus(); } else md.querySelector('input,textarea').focus();
   $('p3Back').onclick=()=>{ md.hidden=true; if(step===1&&ex===C.ex) renderStep1(); };
@@ -1188,7 +1187,8 @@ function trendTable(id,rows){
 /* đồ thị nhỏ trong ô "Đồ thị minh hoạ": nồng độ CO₂ (ppm) theo phút 1–5 từ số em đã ghi */
 function drawMinis(){ document.querySelectorAll('canvas[data-chart]').forEach(drawMini); }
 function drawMini(cv){
-  const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth||220,H=cv.clientHeight||96;
+  const W=cv.clientWidth,H=cv.clientHeight; if(!W||!H) return;   // chưa hiện / chưa có kích thước: chờ lần vẽ sau
+  const dpr=Math.min(2,window.devicePixelRatio||1);
   cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   const vals=[1,2,3,4,5].map(m=>{ const v=getVal(`${cv.dataset.chart}-min-${m}`,''); return v===''?null:Number(v); }),nums=vals.filter(v=>v!==null);
@@ -1279,7 +1279,7 @@ function renderSheet(target){
     if(!confirm('Xoá toàn bộ nội dung đã điền trong phiếu thực hành?')) return;
     store={}; saveStore(); p2rows=[1,2,3,4,5]; renderSheet();
   };
-  drawChart(); drawMinis();
+  drawChartsSoon();
   sheet.scrollTop=0;
   if(target) requestAnimationFrame(()=>$(target).scrollIntoView({block:'start'}));
 }
@@ -1292,7 +1292,8 @@ function wireFields(root){
 function drawChart(){ ['p2chart','p2mChart'].forEach(id=>drawChartOn($(id))); }   // đồ thị ở Mục 3 và ở phiếu bật lên trên bàn
 function drawChartOn(cv){
   if(!cv) return;
-  const dpr=Math.min(2,window.devicePixelRatio||1),W=cv.clientWidth||600,H=cv.clientHeight||180;
+  const W=cv.clientWidth,H=cv.clientHeight; if(!W||!H) return;   // chưa hiện / chưa có kích thước: chờ lần vẽ sau
+  const dpr=Math.min(2,window.devicePixelRatio||1);
   cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   const L=52,R=14,T=14,B=28;
@@ -1307,7 +1308,20 @@ function drawChartOn(cv){
   let started=false; vals.forEach((v,i)=>{ if(v===null) return; started?ctx.lineTo(x(i),y(v)):ctx.moveTo(x(i),y(v)); started=true; }); ctx.stroke();
   vals.forEach((v,i)=>{ if(v===null) return; ctx.beginPath(); ctx.arc(x(i),y(v),4.5,0,7); ctx.fillStyle='#C8F04A'; ctx.fill(); ctx.strokeStyle='#0E5A55'; ctx.lineWidth=2; ctx.stroke(); });
 }
-window.addEventListener('resize',()=>{ if(step===2){ drawChart(); drawMinis(); } });
+/* vẽ đồ thị sau khi khung đã có kích thước thật (phiếu/modal vừa mở, đổi bề rộng, in ấn) —
+   tránh canvas bị kéo bitmap khiến chữ và số trên trục bị giãn ngang */
+let chartsRaf=0;
+function drawChartsSoon(){
+  if(chartsRaf) return;
+  chartsRaf=requestAnimationFrame(()=>{ chartsRaf=0; drawChart(); drawMinis(); });
+}
+window.addEventListener('resize',drawChartsSoon);
+window.addEventListener('beforeprint',drawChartsSoon);
+window.addEventListener('afterprint',drawChartsSoon);
+if(window.ResizeObserver){
+  const ro=new ResizeObserver(drawChartsSoon);
+  [sheet,$('p1Modal')].forEach(el=>el&&ro.observe(el));
+}
 
 /* ---------------- chuyển bước ---------------- */
 const stepBtns=[...stepsEl.querySelectorAll('.step')];
@@ -1321,7 +1335,7 @@ function go(n,target){
   stepsEl.classList.remove('open');
   closeTipSilently();
   if(n!==1){ $('p1Modal').hidden=true; if(model()&&model().pa1) model().pa1.exit(); updateClock(); }
-  if(n===2){ setPanel(''); setActions([]); renderSheet(target); sheet.classList.add('show'); speak('Phiếu thực hành. Em hoàn thành các phiếu số 1, 2 và 3.'); }
+  if(n===2){ setPanel(''); setActions([]); sheet.classList.add('show'); renderSheet(target); speak('Phiếu thực hành. Em hoàn thành các phiếu số 1, 2 và 3.'); }
   else{ sheet.classList.remove('show'); n===0?(model()&&model().setFocus(0),renderStep0(),speak()):renderStep1(); }
 }
 stepBtns.forEach(b=>b.onclick=()=>{
@@ -2609,12 +2623,67 @@ const tn2aVal=(k,t)=>co2Reading(CO2_AIR,TN2A_RATE[k],t,2.1+k*1.7);
 const tn2aPPM=()=>tn2aVal(tn2aCur(),tn2a.minutes);
 function tn2aEmit(msg){dirty=true;tn2a.onChange?.(msg||null);}
 function tn2aState(){return {i:tn2a.i,open:tn2a.open.slice(),seeded:tn2a.seeded.slice(),lamp:tn2a.lamp,hours:tn2a.hours,minutes:tn2a.minutes,playing:tn2a.playing,awaiting:tn2a.awaiting,records:tn2a.records.map(r=>r.length),flask:tn2aCur(),busy:tn2aBusy,done:tn2a.i===8,act:!!(TN2A_DRAG[tn2a.i]||TN2A_CLICK[tn2a.i]),how:TN2A_DRAG[tn2a.i]?'drag':TN2A_CLICK[tn2a.i]?'click':''};}
+/* nhãn giấy dán trên thân bình tam giác (Thí nghiệm 2): tờ giấy trắng hơi lệch, in số bình */
+const paperLabels=[];
+function flaskFrontZ(f,y){   // bán kính mặt kính phía trước tại độ cao y, tính trong hệ toạ độ của bình
+  const inv=new THREE.Matrix4().copy(f.matrixWorld).invert(),v=new THREE.Vector3();
+  const isGlass=m=>{if(!m)return false;const a=Array.isArray(m)?m:[m];return a.some(x=>x===glassThin||x===glass||(x.isMeshPhysicalMaterial&&x.transparent));};
+  for(const band of [.02,.05,.09]){
+    let z=-Infinity;
+    f.traverse(o=>{
+      if(!o.isMesh||!o.visible||!isGlass(o.material))return;
+      const p=o.geometry&&o.geometry.attributes&&o.geometry.attributes.position;if(!p)return;
+      for(let i=0;i<p.count;i++){v.fromBufferAttribute(p,i).applyMatrix4(o.matrixWorld).applyMatrix4(inv);
+        if(Math.abs(v.y-y)<=band&&v.z>z)z=v.z;}
+    });
+    if(z>-Infinity)return z;
+  }
+  return null;
+}
+function flaskPaperLabel(f,n){
+  f.updateMatrixWorld(true);
+  const b=new THREE.Box3().setFromObject(f).applyMatrix4(new THREE.Matrix4().copy(f.matrixWorld).invert());
+  const h=b.max.y-b.min.y,w=b.max.x-b.min.x,size=Math.min(w*.38,h*.195),y=b.min.y+h*.3;
+  const cx=(b.min.x+b.max.x)/2,cz=(b.min.z+b.max.z)/2;
+  const fT=flaskFrontZ(f,y+size*.48),fB=flaskFrontZ(f,y-size*.48);
+  const rT=(fT??b.max.z)-cz,rB=(fB??b.max.z)-cz;
+  const arc=Math.min(1.15,size/((rT+rB)/2));
+
+  const cv=document.createElement('canvas');cv.width=cv.height=256;
+  const c=cv.getContext('2d');c.clearRect(0,0,256,256);
+  const rr=(x0,y0,w0,h0,r0)=>{c.beginPath();c.moveTo(x0+r0,y0);c.arcTo(x0+w0,y0,x0+w0,y0+h0,r0);c.arcTo(x0+w0,y0+h0,x0,y0+h0,r0);c.arcTo(x0,y0+h0,x0,y0,r0);c.arcTo(x0,y0,x0+w0,y0,r0);c.closePath();};
+  c.save();c.translate(128,128);c.rotate(n%2?-.05:.045);c.translate(-128,-128);
+  c.shadowColor='rgba(4,24,22,.45)';c.shadowBlur=16;c.shadowOffsetY=7;
+  c.fillStyle='#f9f6ea';rr(30,30,196,196,26);c.fill();
+  c.shadowColor='transparent';c.strokeStyle='rgba(70,82,76,.28)';c.lineWidth=2;c.stroke();
+  c.fillStyle='rgba(255,255,255,.55)';rr(38,38,180,84,16);c.fill();
+  c.fillStyle='#16201e';c.font='900 132px Roboto,Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(n),128,140);
+  c.restore();
+  const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=8;
+  const rTop=rT+.004,rBot=rB+.004;
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBot,size,24,1,true,-arc/2,arc),
+    new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));
+  m.position.y=y;m.renderOrder=8;
+  const g=new THREE.Group();g.position.set(cx,0,cz);g.add(m);f.add(g);
+  paperLabels.push({g,f,cx,cz});
+  return g;
+}
+const _paperCam=new THREE.Vector3();
+function updatePaperLabels(){   // xoay nhãn quanh thân bình để tờ giấy luôn hướng về phía người xem
+  for(const L of paperLabels){
+    L.f.updateWorldMatrix(true,false);
+    _paperCam.copy(camera.position);L.f.worldToLocal(_paperCam);
+    const dx=_paperCam.x-L.cx,dz=_paperCam.z-L.cz;
+    if(dx*dx+dz*dz>1e-4) L.g.rotation.y=Math.atan2(dx,dz);
+  }
+}
 function buildLab3(){
   if(lab3)return true;
   if([1,3,12].some(n=>!rawGLB[SPEC[n].url])||CO2_PARTS.some(url=>!rawGLB[url])||!tweezersModel)return false;
   const root=new THREE.Group();scene.add(root);
   const tool=(n,pos,opt={})=>{const g=wrap(rawGLB[SPEC[n].url].clone(true),{...SPEC[n],...opt});g.position.set(...pos);root.add(g);shadowsFor(g);return g;};
   const flasks=[[-1.0,0,-.5],[.5,0,-.5]].map(p=>{const f=tool(3,p,{center:true});f.traverse(o=>{if(o.isMesh&&o.material===glass)o.material=glassThin;});return f;});
+  flasks.forEach((f,k)=>flaskPaperLabel(f,k+1));   // nhãn giấy số 1, 2 dán trên thân bình
   // nút cao su nằm chung khối với bình → gom các mặt "Cork" thành một vật riêng để nhấc ra đặt xuống bàn
   const corks=flasks.map((f,k)=>{
     const st=new THREE.Group();f.add(st);f.updateMatrixWorld(true);const list=[];
@@ -2872,6 +2941,7 @@ function buildLab4(){
   const root=new THREE.Group();scene.add(root);
   const tool=(n,pos,opt={})=>{const g=wrap(rawGLB[SPEC[n].url].clone(true),{...SPEC[n],center:true,...opt});g.position.set(...pos);root.add(g);shadowsFor(g);return g;};
   const flasks=[[-1.55,0,-.5],[-.3,0,-.5],[.95,0,-.5]].map(p=>{const f=tool(3,p);f.traverse(o=>{if(o.isMesh&&o.material===glass){o.material=glassThin;o.renderOrder=3;}});return f;});
+  flasks.forEach((f,k)=>flaskPaperLabel(f,k+1));   // nhãn giấy số 1, 2, 3 dán trên thân bình
   // nút cao su nằm chung khối với bình → gom các mặt "Cork" thành một vật riêng; khi mở đặt nằm trên bàn phía trước bình
   const corks=flasks.map(f=>{
     const st=new THREE.Group();f.add(st);f.updateMatrixWorld(true);const list=[];
@@ -3198,6 +3268,7 @@ function buildLab5(){
   const root=new THREE.Group();scene.add(root);
   const tool=(n,pos,opt={})=>{const g=wrap(rawGLB[SPEC[n].url].clone(true),{...SPEC[n],center:true,...opt});g.position.set(...pos);root.add(g);shadowsFor(g);return g;};
   const flasks=[[-1.0,0,-.5],[.5,0,-.5]].map(p=>{const f=tool(3,p);f.traverse(o=>{if(o.isMesh&&o.material===glass){o.material=glassThin;o.renderOrder=3;}});return f;});
+  flasks.forEach((f,k)=>flaskPaperLabel(f,k+1));   // nhãn giấy số 1, 2 dán trên thân bình
   // nút cao su gom thành vật riêng; nút mở nằm trên bàn (không bay theo bình); miệng bình đo từ nút lúc còn đậy
   let mouth=null;
   const corks=flasks.map((f,k)=>{
@@ -3656,6 +3727,7 @@ function render(){
   if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){ renderer.setPixelRatio(dpr); renderer.setSize(w,h,false); }
   camera.aspect=w/h; camera.updateProjectionMatrix();
   camera.position.copy(cur.eye); camera.up.set(0,1,0); camera.lookAt(cur.target);
+  updatePaperLabels();
   table.visible=!under;
   trays.visible=!under&&!(pa1.active||pa2.active||tn2a.active||tn2b.active||tn2c.active);
   pa1Trays.visible=!under&&pa1.active;
